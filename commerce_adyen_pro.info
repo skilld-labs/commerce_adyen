@@ -1,0 +1,11 @@
+name = Commerce Adyen PRO
+description = Adyen payment gateway for Drupal Commerce
+
+package = Commerce
+core = 7.x
+php = 5.5
+
+dependencies[] = commerce
+dependencies[] = commerce_payment
+
+configure = admin/commerce/config/payment-methods
