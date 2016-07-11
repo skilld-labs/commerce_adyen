@@ -241,12 +241,12 @@ function commerce_adyen_pro_handle_response() {
   }
 
   foreach ([
-             'authResult',
-             'pspReference',
-             'merchantReference',
-             'skinCode',
-             'merchantReturnData',
-           ] as $name) {
+    'authResult',
+    'pspReference',
+    'merchantReference',
+    'skinCode',
+    'merchantReturnData',
+  ] as $name) {
     if (isset($data[$name])) {
       $hmacData .= $data[$name];
     }
