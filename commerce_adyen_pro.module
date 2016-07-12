@@ -225,7 +225,6 @@ function commerce_adyen_pro_handle_response() {
     _commerce_adyen_pro_broken_response();
   }
 
-
   $order = commerce_order_load($data['merchantReference']);
   $transaction = commerce_payment_transaction_load_multiple([], ['order_id' =>  $order->order_id]);
   $transaction = !empty($transaction) ? array_shift($transaction) : commerce_payment_transaction_new('adyen_pro', $order->order_id);
