@@ -313,12 +313,12 @@ function _commerce_adyen_pro_signature_calculation(array $data, array $settings,
       }
       else {
         foreach ([
-                   'authResult',
-                   'pspReference',
-                   'merchantReference',
-                   'skinCode',
-                   'merchantReturnData',
-                 ] as $name) {
+          'authResult',
+          'pspReference',
+          'merchantReference',
+          'skinCode',
+          'merchantReturnData',
+        ] as $name) {
           if (isset($data[$name])) {
             $sign_data .= $data[$name];
           }
