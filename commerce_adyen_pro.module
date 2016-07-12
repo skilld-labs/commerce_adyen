@@ -42,10 +42,11 @@ function commerce_adyen_pro_commerce_payment_method_info() {
 }
 
 /**
- * Payment method callback; return the settings form for a payment method.
+ * Payment method callback: settings form.
  *
- * @param $settings
+ * @param array|NULL $settings
  *   An array of the current settings.
+ *
  * @return
  *   A form snippet.
  */
@@ -200,7 +201,7 @@ function commerce_adyen_pro_redirect_form(array $form, array &$form_state,  \std
 }
 
 /**
- * Here the real payment processing is done.
+ * Payment method callback: all returns from Adyen are returned here.
  */
 function commerce_adyen_pro_handle_response() {
   $data = $_GET;
