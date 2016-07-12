@@ -1,7 +1,7 @@
 <?php
 /**
  * @file
- * Lush Adyen Gateways.
+ * Implements Adyen payments.
  */
 
 define('COMMERCE_ADYEN_PRO_RETURN_URL', 'commerce/adyen_pro');

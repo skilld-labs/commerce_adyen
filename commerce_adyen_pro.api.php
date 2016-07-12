@@ -1,8 +1,7 @@
 <?php
-
 /**
  * @file
- * Hook documentation for the PayPal WPS module.
+ * Hook documentation for the Adyen PRO module.
  */
 
 
