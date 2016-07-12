@@ -413,6 +413,7 @@ function _commerce_adyen_pro_broken_response() {
   // because we cannot trust the data we received.
   drupal_goto();
 }
+
 /**
  * Returns an array of all possible languages.
  *
