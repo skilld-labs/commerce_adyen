@@ -1,7 +1,7 @@
 <?php
 /**
  * @file
- * Implements Adyen payments.
+ * Lush Adyen Gateways.
  */
 
 define('COMMERCE_ADYEN_PRO_RETURN_URL', 'commerce/adyen_pro');
@@ -10,6 +10,8 @@ define('COMMERCE_ADYEN_PRO_RETURN_URL', 'commerce/adyen_pro');
  * Implementation of hook_menu().
  */
 function commerce_adyen_pro_menu() {
+  $items = [];
+
   $items[COMMERCE_ADYEN_PRO_RETURN_URL] = [
     'title' => 'adyen response',
     'page callback' => 'commerce_adyen_pro_handle_response',
@@ -44,9 +46,8 @@ function commerce_adyen_pro_commerce_payment_method_info() {
 /**
  * Payment method callback: settings form.
  *
- * @param array|NULL $settings
+ * @param $settings
  *   An array of the current settings.
- *
  * @return
  *   A form snippet.
  */
@@ -147,33 +148,19 @@ function commerce_adyen_pro_redirect_form(array $form, array &$form_state,  \std
   // Payment fields.
   //
   // @link https://docs.adyen.com/developers/hpp-manual#hpppaymentfields
-  $data = [
-    // Amount specified in minor units.
-    'paymentAmount' => $total_total['amount'],
-    // The three-letter capitalised ISO currency code to pay in i.e. EUR.
-    'currencyCode' => $total_total['currency_code'],
-    // The date with in which the ordered goods or services need to be shipped
-    // or provided to the buyer.
-    'shipBeforeDate' => date('Y-m-d', strtotime('+5 day')),
-    // The merchant reference is your reference for the payment.
-    'merchantReference' => $order->order_id,
-    // The skin code that should be used for the payment.
-    'skinCode' => $settings['skin_code'],
-    // The merchant account you want to process this payment with.
-    'merchantAccount' => $settings['merchant_account'],
-    // The final time by which a payment needs to have been made.
-    'sessionValidity' => date(DATE_ATOM, strtotime('+1 hour')),
-    // The e-mailaddress of the shopper.
-    'shopperEmail' => $user->mail,
-    // The shopper reference, i.e. the shopper ID.
-    'shopperReference' => $order->uid,
-    // This field willl be passed back as-is on the return URL when the shopper
-    // completes (or abandons) the payment and returns to your shop.
-    'merchantReturnData' => $order->data['payment_redirect_key'],
-    // A combination of language code and country code to specify the language
-    // used in the session i.e. en_GB.
-    'shopperLocale' => $settings['shopper_locale'],
-  ];
+  $data = array_combine(_commerce_adyen_pro_required_option(), [
+    $total_total['amount'],
+    $total_total['currency_code'],
+    date('Y-m-d', strtotime('+5 day')),
+    $order->order_id,
+    $settings['skin_code'],
+    $settings['merchant_account'],
+    date(DATE_ATOM, strtotime('+1 hour')),
+    $user->mail,
+    $order->uid,
+    $order->data['payment_redirect_key'],
+    $settings['shopper_locale'],
+  ]);
 
   // Base64-encode the binary result of the HMAC computation.
   $data['merchantSig'] = _commerce_adyen_pro_signature_calculation($data, $settings, 'request');
@@ -191,6 +178,7 @@ function commerce_adyen_pro_redirect_form(array $form, array &$form_state,  \std
   }
 
   $form['#action'] = _commerce_adyen_pro_server_url($settings['is_test']);
+  $form['#pre_render'][] = '_commerce_adyen_pro_form_modify';
 
   $form['submit'] = [
     '#type' => 'submit',
@@ -201,10 +189,38 @@ function commerce_adyen_pro_redirect_form(array $form, array &$form_state,  \std
 }
 
 /**
+ * Clear form data
+ *
+ * @param $form
+ *   Existing form.
+ *
+ * @return mixed
+ *   Drupal form.
+ */
+function _commerce_adyen_pro_form_modify($form) {
+  $adyen_option = _commerce_adyen_pro_required_option();
+  $adyen_option[] = 'merchantSig';
+
+  foreach ($form as $key => $value) {
+    if (!in_array($key, $adyen_option) && '#' !== substr($key, 0, 1)) {
+      unset($form[$key]);
+    }
+  }
+
+  return $form;
+}
+
+/**
  * Payment method callback: all returns from Adyen are returned here.
  */
 function commerce_adyen_pro_handle_response() {
   $data = $_GET;
+
+  if (empty($data)) {
+    watchdog('commerce_adyen', t('Received adyen response is empty'), [], WATCHDOG_ERROR);
+    _commerce_adyen_pro_broken_response();
+  }
+
   $payment_method = commerce_payment_method_instance_load('adyen_pro|commerce_payment_adyen_pro');
 
   if ($data['merchantSig'] !== _commerce_adyen_pro_signature_calculation($data, $payment_method['settings'], 'response')) {
@@ -265,6 +281,36 @@ function commerce_adyen_pro_handle_response() {
   }
 
   drupal_goto(commerce_checkout_order_uri($order));
+}
+
+function _commerce_adyen_pro_required_option() {
+  return [
+    // Amount specified in minor units.
+    'paymentAmount',
+    // The three-letter capitalised ISO currency code to pay in i.e. EUR.
+    'currencyCode',
+    // The date with in which the ordered goods or services need to be shipped
+    // or provided to the buyer.
+    'shipBeforeDate',
+    // The merchant reference is your reference for the payment.
+    'merchantReference',
+    // The skin code that should be used for the payment.
+    'skinCode',
+    // The merchant account you want to process this payment with.
+    'merchantAccount',
+    // The final time by which a payment needs to have been made.
+    'sessionValidity',
+    // The e-mailaddress of the shopper.
+    'shopperEmail',
+    // The shopper reference, i.e. the shopper ID.
+    'shopperReference',
+    // This field willl be passed back as-is on the return URL when the shopper
+    // completes (or abandons) the payment and returns to your shop.
+    'merchantReturnData',
+    // A combination of language code and country code to specify the language
+    // used in the session i.e. en_GB.
+    'shopperLocale',
+  ];
 }
 
 /**
@@ -413,7 +459,6 @@ function _commerce_adyen_pro_broken_response() {
   // because we cannot trust the data we received.
   drupal_goto();
 }
-
 /**
  * Returns an array of all possible languages.
  *
