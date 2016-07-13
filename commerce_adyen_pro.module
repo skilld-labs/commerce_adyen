@@ -5,6 +5,7 @@
  */
 
 define('COMMERCE_ADYEN_PRO_RETURN_URL', 'commerce/adyen_pro');
+define('COMMERCE_ADYEN_PAYMENT_METHOD_NAME', 'commerce_adyen_pro');
 
 /**
  * Implementation of hook_menu().
@@ -13,8 +14,7 @@ function commerce_adyen_pro_menu() {
   $items = [];
 
   $items[COMMERCE_ADYEN_PRO_RETURN_URL] = [
-    'title' => 'adyen response',
-    'page callback' => 'commerce_adyen_pro_handle_response',
+    'page callback' => COMMERCE_ADYEN_PAYMENT_METHOD_NAME . '_handle_response',
     'access arguments' => ['access checkout'],
     'type' => MENU_CALLBACK,
   ];
@@ -28,9 +28,9 @@ function commerce_adyen_pro_menu() {
 function commerce_adyen_pro_commerce_payment_method_info() {
   $payment_methods = [];
 
-  $payment_methods['adyen_pro'] = [
-    'base' => 'commerce_adyen_pro',
-    'method_id' => 'adyen_pro',
+  $payment_methods[COMMERCE_ADYEN_PAYMENT_METHOD_NAME] = [
+    'base' => COMMERCE_ADYEN_PAYMENT_METHOD_NAME,
+    'method_id' => COMMERCE_ADYEN_PAYMENT_METHOD_NAME,
     'display_title' => t('Adyen PRO'),
     'title' => t('Adyen PRO'),
     'description' => t('Redirect users to submit payments through Adyen.'),
@@ -46,9 +46,10 @@ function commerce_adyen_pro_commerce_payment_method_info() {
 /**
  * Payment method callback: settings form.
  *
- * @param $settings
+ * @param array $settings
  *   An array of the current settings.
- * @return
+ *
+ * @return array
  *   A form snippet.
  */
 function commerce_adyen_pro_settings_form(array $settings = NULL) {
@@ -122,20 +123,8 @@ function commerce_adyen_pro_settings_form(array $settings = NULL) {
 
 /**
  * Payment method callback.
- *
- * @param array $form
- *   Existing form.
- * @param array $form_state
- *   Drupal form state.
- * @param stdClass $order
- *   Commerce order object.
- * @param array $payment_method
- *   Payment method settings.
- *
- * @return array
- *   Request parameters to Adyen.
  */
-function commerce_adyen_pro_redirect_form(array $form, array &$form_state,  \stdClass $order, array $payment_method) {
+function commerce_adyen_pro_redirect_form(array $form, array &$form_state, \stdClass $order, array $payment_method) {
   if (!_commerce_adyen_pro_check_account($payment_method['settings'])) {
     return [];
   }
@@ -143,7 +132,6 @@ function commerce_adyen_pro_redirect_form(array $form, array &$form_state,  \std
   $settings = $payment_method['settings'];
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
   $total_total = $order_wrapper->commerce_order_total->value();
-  $user = user_load($order->uid);
 
   // Payment fields.
   //
@@ -151,30 +139,28 @@ function commerce_adyen_pro_redirect_form(array $form, array &$form_state,  \std
   $data = array_combine(_commerce_adyen_pro_required_option(), [
     $total_total['amount'],
     $total_total['currency_code'],
-    date('Y-m-d', strtotime('+5 day')),
     $order->order_id,
     $settings['skin_code'],
     $settings['merchant_account'],
     date(DATE_ATOM, strtotime('+1 hour')),
-    $user->mail,
-    $order->uid,
+    $order->mail,
     $order->data['payment_redirect_key'],
     $settings['shopper_locale'],
   ]);
 
-  // Base64-encode the binary result of the HMAC computation.
-  $data['merchantSig'] = _commerce_adyen_pro_signature_calculation($data, $settings, 'request');
-
   // Allow modules to alter parameters of the request.
   drupal_alter('commerce_adyen_pro_redirect_form_data', $data, $order);
 
+  // Base64-encode the binary result of the HMAC computation.
+  $data['merchantSig'] = _commerce_adyen_pro_signature_calculation($data, $settings, 'request');
+
+  $data = array_filter($data);
+
   foreach ($data as $name => $value) {
-    if (!empty($value)) {
-      $form[$name] = [
-        '#type' => 'hidden',
-        '#value' => $value,
-      ];
-    }
+    $form[$name] = [
+      '#type' => 'hidden',
+      '#value' => $value,
+    ];
   }
 
   $form['#action'] = _commerce_adyen_pro_server_url($settings['is_test']);
@@ -189,20 +175,20 @@ function commerce_adyen_pro_redirect_form(array $form, array &$form_state,  \std
 }
 
 /**
- * Clear form data
+ * Clear form data.
  *
- * @param $form
+ * @param array $form
  *   Existing form.
  *
  * @return mixed
  *   Drupal form.
  */
-function _commerce_adyen_pro_form_modify($form) {
-  $adyen_option = _commerce_adyen_pro_required_option();
-  $adyen_option[] = 'merchantSig';
+function _commerce_adyen_pro_form_modify(array $form) {
+  $adyen_options = _commerce_adyen_pro_required_option();
+  $adyen_options[] = 'merchantSig';
 
   foreach ($form as $key => $value) {
-    if (!in_array($key, $adyen_option) && '#' !== substr($key, 0, 1)) {
+    if (!in_array($key, $adyen_options) && element_child($key)) {
       unset($form[$key]);
     }
   }
@@ -214,39 +200,38 @@ function _commerce_adyen_pro_form_modify($form) {
  * Payment method callback: all returns from Adyen are returned here.
  */
 function commerce_adyen_pro_handle_response() {
-  $data = $_GET;
+  $data = drupal_get_query_parameters();
 
   if (empty($data)) {
     watchdog('commerce_adyen', t('Received adyen response is empty'), [], WATCHDOG_ERROR);
     _commerce_adyen_pro_broken_response();
   }
 
-  $payment_method = commerce_payment_method_instance_load('adyen_pro|commerce_payment_adyen_pro');
+  $payment_method = commerce_payment_method_instance_load(COMMERCE_ADYEN_PAYMENT_METHOD_NAME . '|commerce_payment_' . COMMERCE_ADYEN_PAYMENT_METHOD_NAME);
 
   if ($data['merchantSig'] !== _commerce_adyen_pro_signature_calculation($data, $payment_method['settings'], 'response')) {
-    watchdog('commerce_adyen', t('Received adyen response with invalid HMAC signature.'), [], WATCHDOG_ERROR);
+    watchdog(COMMERCE_ADYEN_PAYMENT_METHOD_NAME, t('Received adyen response with invalid HMAC signature.'), [], WATCHDOG_ERROR);
     _commerce_adyen_pro_broken_response();
   }
 
   if (!is_numeric($data['merchantReference'])) {
-    watchdog('commerce_adyen', t('Received adyen response with invalid merchantReference.'), [], WATCHDOG_ERROR);
+    watchdog(COMMERCE_ADYEN_PAYMENT_METHOD_NAME, t('Received adyen response with invalid merchantReference.'), [], WATCHDOG_ERROR);
     _commerce_adyen_pro_broken_response();
   }
 
-  if (
-    !empty($data['authResult']) &&
-    !in_array($data['authResult'], ['AUTHORISED', 'REFUSED', 'ERROR', 'CANCELLED', 'PENDING'])
-  ) {
-    watchdog('commerce_adyen', t('Received adyen response with invalid authResult.'), [], WATCHDOG_ERROR);
+  $data['authResult'] = strtolower($data['authResult']);
+
+  if (!in_array($data['authResult'], ['authorised', 'refused', 'error', 'cancelled', 'pending'])) {
+    watchdog(COMMERCE_ADYEN_PAYMENT_METHOD_NAME, t('Received adyen response with invalid authResult.'), [], WATCHDOG_ERROR);
     _commerce_adyen_pro_broken_response();
   }
 
   $order = commerce_order_load($data['merchantReference']);
   $transaction = commerce_payment_transaction_load_multiple([], ['order_id' =>  $order->order_id]);
-  $transaction = !empty($transaction) ? array_shift($transaction) : commerce_payment_transaction_new('adyen_pro', $order->order_id);
+  $transaction = !empty($transaction) ? array_shift($transaction) : commerce_payment_transaction_new(COMMERCE_ADYEN_PAYMENT_METHOD_NAME, $order->order_id);
 
   switch ($data['authResult']) {
-    case 'AUTHORISED':
+    case 'authorised':
       $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
       $total_total = $order_wrapper->commerce_order_total->value();
 
@@ -261,21 +246,21 @@ function commerce_adyen_pro_handle_response() {
       $transaction->uid = $order->uid;
       break;
 
-    case 'PENDING':
+    case 'pending':
       $transaction->status = COMMERCE_PAYMENT_STATUS_PENDING;
       $transaction->message = t('The payment is pending because systems providing final status information for the payment are unavailable, or if the shopper needs to take further action to complete the payment.');
       _commerce_adyen_pro_response_message($data['authResult']);
       break;
 
-    case 'ERROR':
-    case 'REFUSED':
-    case 'CANCELLED':
+    case 'error':
+    case 'refused':
+    case 'cancelled':
       _commerce_adyen_pro_response_message($data['authResult']);
       commerce_payment_redirect_pane_previous_page($order);
       break;
   }
 
-  if (in_array($data['authResult'], ['AUTHORISED', 'PENDING'])) {
+  if (in_array($data['authResult'], ['authorised', 'pending'])) {
     commerce_payment_transaction_save($transaction);
     commerce_payment_redirect_pane_next_page($order);
   }
@@ -283,15 +268,18 @@ function commerce_adyen_pro_handle_response() {
   drupal_goto(commerce_checkout_order_uri($order));
 }
 
+/**
+ * Get required Adyen options name.
+ *
+ * @return array
+ *   Adyen options name.
+ */
 function _commerce_adyen_pro_required_option() {
   return [
     // Amount specified in minor units.
     'paymentAmount',
     // The three-letter capitalised ISO currency code to pay in i.e. EUR.
     'currencyCode',
-    // The date with in which the ordered goods or services need to be shipped
-    // or provided to the buyer.
-    'shipBeforeDate',
     // The merchant reference is your reference for the payment.
     'merchantReference',
     // The skin code that should be used for the payment.
@@ -302,8 +290,6 @@ function _commerce_adyen_pro_required_option() {
     'sessionValidity',
     // The e-mailaddress of the shopper.
     'shopperEmail',
-    // The shopper reference, i.e. the shopper ID.
-    'shopperReference',
     // This field willl be passed back as-is on the return URL when the shopper
     // completes (or abandons) the payment and returns to your shop.
     'merchantReturnData',
@@ -334,6 +320,10 @@ function _commerce_adyen_pro_signature_calculation(array $data, array $settings,
       $escapeval = function($val) {
         return str_replace(':', '\\:', str_replace('\\', '\\\\', $val));
       };
+
+      if ('response' === $operation) {
+        unset($data['merchantSig']);
+      }
 
       // Sort the array by key using SORT_STRING order
       ksort($data, SORT_STRING);
@@ -431,20 +421,20 @@ function _commerce_adyen_pro_check_account(array $settings) {
  * Show message according to payment status.
  *
  * @param string $status
- *   Payment status
+ *   Payment status.
  */
 function _commerce_adyen_pro_response_message($status) {
   switch ($status) {
-    case 'REFUSED':
-    case 'ERROR':
+    case 'refused':
+    case 'error':
       drupal_set_message(t('Payment authorisation was not successful. Please try again.'), 'error');
       break;
 
-    case 'CANCELLED':
+    case 'cancelled':
       drupal_set_message(t('Payment cancelled'), 'status');
       break;
 
-    case 'PENDING':
+    case 'pending':
       drupal_set_message(t('Payment authorisation was not fully completed.'), 'error');
       break;
   }
@@ -459,6 +449,7 @@ function _commerce_adyen_pro_broken_response() {
   // because we cannot trust the data we received.
   drupal_goto();
 }
+
 /**
  * Returns an array of all possible languages.
  *
