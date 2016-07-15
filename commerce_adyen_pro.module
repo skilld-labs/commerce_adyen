@@ -1,11 +1,26 @@
 <?php
 /**
  * @file
- * Lush Adyen Gateways.
+ * Implements Adyen for use with Drupal Commerce.
  */
 
 define('COMMERCE_ADYEN_PRO_RETURN_URL', 'commerce/adyen_pro');
-define('COMMERCE_ADYEN_PAYMENT_METHOD_NAME', 'commerce_adyen_pro');
+define('COMMERCE_ADYEN_PRO_PAYMENT_METHOD_NAME', 'commerce_adyen_pro');
+
+// Adyen event codes.
+define('COMMERCE_ADYEN_PRO_EVENT_CODE_AUTHORISATION', 'authorisation');
+define('COMMERCE_ADYEN_PRO_EVENT_CODE_REFUND', 'refund');
+define('COMMERCE_ADYEN_PRO_EVENT_CODE_CANCELLATION', 'cancellation');
+define('COMMERCE_ADYEN_PRO_EVENT_CODE_CANCEL_OR_REFUND', 'cancel_or_refund');
+define('COMMERCE_ADYEN_PRO_EVENT_CODE_CAPTURE', 'capture');
+define('COMMERCE_ADYEN_PRO_EVENT_CODE_REFUNDED_REVERSED', 'refunded_reversed');
+define('COMMERCE_ADYEN_PRO_EVENT_CODE_CAPTURE_FAILED', 'capture_failed');
+define('COMMERCE_ADYEN_PRO_EVENT_CODE_REFUND_FAILED', 'refund_failed');
+define('COMMERCE_ADYEN_PRO_EVENT_CODE_REQUEST_FOR_INFORMATION', 'request_for_information');
+define('COMMERCE_ADYEN_PRO_EVENT_CODE_NOTIFICATION_OF_CHARGEBACK', 'notification_of_chargeback');
+define('COMMERCE_ADYEN_PRO_EVENT_CODE_CHARGEBACK', 'chargeback');
+define('COMMERCE_ADYEN_PRO_EVENT_CODE_CHARGEBACK_REVERSED', 'chargeback_reversed');
+define('COMMERCE_ADYEN_PRO_EVENT_CODE_REPORT_AVAILABLE', 'report_available');
 
 /**
  * Implementation of hook_menu().
@@ -14,8 +29,14 @@ function commerce_adyen_pro_menu() {
   $items = [];
 
   $items[COMMERCE_ADYEN_PRO_RETURN_URL] = [
-    'page callback' => COMMERCE_ADYEN_PAYMENT_METHOD_NAME . '_handle_response',
-    'access arguments' => ['access checkout'],
+    'page callback' => 'commerce_adyen_pro_handle_response',
+    'access arguments' => TRUE,
+    'type' => MENU_CALLBACK,
+  ];
+
+  $items[COMMERCE_ADYEN_PRO_RETURN_URL . '/notification'] = [
+    'page callback' => 'commerce_adyen_pro_handle_notification',
+    'access arguments' => TRUE,
     'type' => MENU_CALLBACK,
   ];
 
@@ -28,9 +49,9 @@ function commerce_adyen_pro_menu() {
 function commerce_adyen_pro_commerce_payment_method_info() {
   $payment_methods = [];
 
-  $payment_methods[COMMERCE_ADYEN_PAYMENT_METHOD_NAME] = [
-    'base' => COMMERCE_ADYEN_PAYMENT_METHOD_NAME,
-    'method_id' => COMMERCE_ADYEN_PAYMENT_METHOD_NAME,
+  $payment_methods[COMMERCE_ADYEN_PRO_PAYMENT_METHOD_NAME] = [
+    'base' => COMMERCE_ADYEN_PRO_PAYMENT_METHOD_NAME,
+    'method_id' => COMMERCE_ADYEN_PRO_PAYMENT_METHOD_NAME,
     'display_title' => t('Adyen PRO'),
     'title' => t('Adyen PRO'),
     'description' => t('Redirect users to submit payments through Adyen.'),
@@ -46,24 +67,25 @@ function commerce_adyen_pro_commerce_payment_method_info() {
 /**
  * Payment method callback: settings form.
  *
- * @param array $settings
+ * @param $settings
  *   An array of the current settings.
- *
- * @return array
+ * @return
  *   A form snippet.
  */
 function commerce_adyen_pro_settings_form(array $settings = NULL) {
   $settings += [
     'merchant_account' => '',
+    'client_user' => '',
+    'client_password' => '',
     'skin_code' => '',
     'hmac' => '',
     'hmac_type' => '',
-    'is_test' => TRUE
+    'is_test' => TRUE,
   ];
 
   $form['url'] = [
     '#markup' => t('Please use this URL for the result URL settings: @url', [
-      '@url' => url(COMMERCE_ADYEN_PRO_RETURN_URL, ['absolute' => TRUE])
+      '@url' => url(COMMERCE_ADYEN_PRO_RETURN_URL, ['absolute' => TRUE]),
     ]),
   ];
 
@@ -78,6 +100,22 @@ function commerce_adyen_pro_settings_form(array $settings = NULL) {
     '#title' => t('Merchant Account'),
     '#default_value' => $settings['merchant_account'],
     '#description' => t('Don`t confuse this with your Adyen account name. You find the right value in the backend in the accounts list.'),
+    '#required' => TRUE,
+  ];
+
+  $form['client_user'] = [
+    '#type' => 'textfield',
+    '#title' => t('Client user'),
+    '#default_value' => $settings['client_user'],
+    '#description' => t('User name for web service. You find the right value in Settings -> Users in Adyen UI'),
+    '#required' => TRUE,
+  ];
+
+  $form['client_password'] = [
+    '#type' => 'textfield',
+    '#title' => t('Client password'),
+    '#default_value' => $settings['client_password'],
+    '#description' => t('User password for client user. You find the right value in Settings -> Users in Adyen UI'),
     '#required' => TRUE,
   ];
 
@@ -96,18 +134,18 @@ function commerce_adyen_pro_settings_form(array $settings = NULL) {
     '#required' => TRUE,
   ];
 
-  $form['hmac_type'] = [
+  $form['encoding_algorithm'] = [
     '#type' => 'select',
     '#title' => t('HMAC type'),
     '#description' => t('Please make sure you have the same HMAC type set here and in the Adyen back end.'),
     '#options' => [
-      'sha1' => t('SHA1'),
-      'sha256' => t('SHA256'),
+      'sha1' => 'SHA1',
+      'sha256' => 'SHA256',
     ],
     '#empty_option' => t('-- Select HMAC type --'),
-    '#default_value' => $settings['hmac_type'],
+    '#default_value' => $settings['encoding_algorithm'],
     '#required' => TRUE
-  ];
+   ];
 
   $form['shopper_locale'] = [
     '#type' => 'select',
@@ -136,7 +174,7 @@ function commerce_adyen_pro_redirect_form(array $form, array &$form_state, \stdC
   // Payment fields.
   //
   // @link https://docs.adyen.com/developers/hpp-manual#hpppaymentfields
-  $data = array_combine(_commerce_adyen_pro_required_option(), [
+  $data = array_combine(_commerce_adyen_pro_required_options(), [
     $total_total['amount'],
     $total_total['currency_code'],
     $order->order_id,
@@ -145,7 +183,9 @@ function commerce_adyen_pro_redirect_form(array $form, array &$form_state, \stdC
     date(DATE_ATOM, strtotime('+1 hour')),
     $order->mail,
     $order->data['payment_redirect_key'],
-    $settings['shopper_locale'],
+    // "British English" is the default "shopperLocale" in Adyen.
+    empty($settings['shopper_locale']) ? 'en_GB' : $settings['shopper_locale'],
+    url(COMMERCE_ADYEN_PRO_RETURN_URL, ['absolute' => TRUE]),
   ]);
 
   // Allow modules to alter parameters of the request.
@@ -154,16 +194,14 @@ function commerce_adyen_pro_redirect_form(array $form, array &$form_state, \stdC
   // Base64-encode the binary result of the HMAC computation.
   $data['merchantSig'] = _commerce_adyen_pro_signature_calculation($data, $settings, 'request');
 
-  $data = array_filter($data);
-
-  foreach ($data as $name => $value) {
+  foreach (array_filter($data) as $name => $value) {
     $form[$name] = [
       '#type' => 'hidden',
       '#value' => $value,
     ];
   }
 
-  $form['#action'] = _commerce_adyen_pro_server_url($settings['is_test']);
+  $form['#action'] = _commerce_adyen_pro_server_url($settings['is_test'], 'create');
   $form['#pre_render'][] = '_commerce_adyen_pro_form_modify';
 
   $form['submit'] = [
@@ -177,14 +215,14 @@ function commerce_adyen_pro_redirect_form(array $form, array &$form_state, \stdC
 /**
  * Clear form data.
  *
- * @param array $form
+ * @param $form
  *   Existing form.
  *
  * @return mixed
  *   Drupal form.
  */
 function _commerce_adyen_pro_form_modify(array $form) {
-  $adyen_options = _commerce_adyen_pro_required_option();
+  $adyen_options = _commerce_adyen_pro_required_options();
   $adyen_options[] = 'merchantSig';
 
   foreach ($form as $key => $value) {
@@ -207,38 +245,38 @@ function commerce_adyen_pro_handle_response() {
     _commerce_adyen_pro_broken_response();
   }
 
-  $payment_method = commerce_payment_method_instance_load(COMMERCE_ADYEN_PAYMENT_METHOD_NAME . '|commerce_payment_' . COMMERCE_ADYEN_PAYMENT_METHOD_NAME);
+  $payment_method = commerce_payment_method_instance_load(COMMERCE_ADYEN_PRO_PAYMENT_METHOD_NAME . '|commerce_payment_' . COMMERCE_ADYEN_PRO_PAYMENT_METHOD_NAME);
 
   if ($data['merchantSig'] !== _commerce_adyen_pro_signature_calculation($data, $payment_method['settings'], 'response')) {
-    watchdog(COMMERCE_ADYEN_PAYMENT_METHOD_NAME, t('Received adyen response with invalid HMAC signature.'), [], WATCHDOG_ERROR);
+    watchdog(COMMERCE_ADYEN_PRO_PAYMENT_METHOD_NAME, t('Received adyen response with invalid HMAC signature.'), [], WATCHDOG_ERROR);
     _commerce_adyen_pro_broken_response();
   }
 
   if (!is_numeric($data['merchantReference'])) {
-    watchdog(COMMERCE_ADYEN_PAYMENT_METHOD_NAME, t('Received adyen response with invalid merchantReference.'), [], WATCHDOG_ERROR);
+    watchdog(COMMERCE_ADYEN_PRO_PAYMENT_METHOD_NAME, t('Received adyen response with invalid merchantReference.'), [], WATCHDOG_ERROR);
     _commerce_adyen_pro_broken_response();
   }
 
-  $data['authResult'] = strtolower($data['authResult']);
+  $data['authResult'] = strtolower(check_plain($data['authResult']));
 
   if (!in_array($data['authResult'], ['authorised', 'refused', 'error', 'cancelled', 'pending'])) {
-    watchdog(COMMERCE_ADYEN_PAYMENT_METHOD_NAME, t('Received adyen response with invalid authResult.'), [], WATCHDOG_ERROR);
+    watchdog(COMMERCE_ADYEN_PRO_PAYMENT_METHOD_NAME, t('Received adyen response with invalid authResult.'), [], WATCHDOG_ERROR);
     _commerce_adyen_pro_broken_response();
   }
 
   $order = commerce_order_load($data['merchantReference']);
   $transaction = commerce_payment_transaction_load_multiple([], ['order_id' =>  $order->order_id]);
-  $transaction = !empty($transaction) ? array_shift($transaction) : commerce_payment_transaction_new(COMMERCE_ADYEN_PAYMENT_METHOD_NAME, $order->order_id);
+  $transaction = !empty($transaction) ? array_shift($transaction) : commerce_payment_transaction_new(COMMERCE_ADYEN_PRO_PAYMENT_METHOD_NAME, $order->order_id);
 
   switch ($data['authResult']) {
     case 'authorised':
       $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
-      $total_total = $order_wrapper->commerce_order_total->value();
+      $total_amount = $order_wrapper->commerce_order_total->value();
 
       $transaction->instance_id = $payment_method['instance_id'];
       $transaction->message = t('The payment has completed.');
-      $transaction->amount = $total_total['amount'];
-      $transaction->currency_code = $total_total['currency_code'];
+      $transaction->amount = $total_amount['amount'];
+      $transaction->currency_code = $total_amount['currency_code'];
       $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
       $transaction->remote_status = $data['authResult'];
       $transaction->remote_id = $data['pspReference'];
@@ -269,12 +307,69 @@ function commerce_adyen_pro_handle_response() {
 }
 
 /**
+ * Payment method callback: Notification handling.
+ */
+function commerce_adyen_pro_handle_notification() {
+  $data = $_POST;
+
+  if (empty($data)) {
+    watchdog('commerce_adyen', t('Notification adyen is empty.'), [], WATCHDOG_ERROR);
+
+    return '[accepted]';
+  }
+
+  $data['eventCode'] = strtolower($data['eventCode']);
+
+  switch ($data['eventCode']) {
+    // Confirms whether the payment was authorised successfully.
+    case COMMERCE_ADYEN_PRO_EVENT_CODE_AUTHORISATION:
+    // Confirms that the payment was refunded successfully.
+    case COMMERCE_ADYEN_PRO_EVENT_CODE_REFUND:
+    // Confirms that the payment was cancelled successfully.
+    case COMMERCE_ADYEN_PRO_EVENT_CODE_CANCELLATION:
+    // Confirms that the payment was refunded or cancelled successfully.
+    case COMMERCE_ADYEN_PRO_EVENT_CODE_CANCEL_OR_REFUND:
+    // Confirms that the payment was successfully captured.
+    case COMMERCE_ADYEN_PRO_EVENT_CODE_CAPTURE:
+    // Tells you that the refund for this payment was successfully reversed.
+    case COMMERCE_ADYEN_PRO_EVENT_CODE_REFUNDED_REVERSED:
+    // Tells you that the capture on the authorised payment failed.
+    case COMMERCE_ADYEN_PRO_EVENT_CODE_CAPTURE_FAILED:
+    // Information requested for this payment.
+    case COMMERCE_ADYEN_PRO_EVENT_CODE_REQUEST_FOR_INFORMATION:
+    // Charge back is pending, but can still be defended.
+    case COMMERCE_ADYEN_PRO_EVENT_CODE_NOTIFICATION_OF_CHARGEBACK:
+    // Payment was charged back. This is not sent if a REQUEST_FOR_INFORMATION or
+    // NOTIFICATION_OF_CHARGEBACK notification has already been sent.
+    case COMMERCE_ADYEN_PRO_EVENT_CODE_CHARGEBACK:
+    // Chargeback has been reversed (cancelled).
+    case COMMERCE_ADYEN_PRO_EVENT_CODE_CHARGEBACK_REVERSED:
+    // There is a new report available, the URL of the report is in the "reason" field.
+    case COMMERCE_ADYEN_PRO_EVENT_CODE_REPORT_AVAILABLE:
+      module_invoke_all(
+        'commerce_adyen_pro_handle_notification_' . $data['eventCode'],
+        $data
+      );
+      break;
+  }
+
+  // Returning [accepted], please make sure you always
+  // return [accepted] to us, this is essential to let us
+  // know that you received the notification. If we do NOT receive
+  // [accepted] we try to send the notification again which
+  // will put all other notification in a queue.
+  echo "[accepted]";
+
+  return;
+}
+
+/**
  * Get required Adyen options name.
  *
  * @return array
  *   Adyen options name.
  */
-function _commerce_adyen_pro_required_option() {
+function _commerce_adyen_pro_required_options() {
   return [
     // Amount specified in minor units.
     'paymentAmount',
@@ -296,6 +391,9 @@ function _commerce_adyen_pro_required_option() {
     // A combination of language code and country code to specify the language
     // used in the session i.e. en_GB.
     'shopperLocale',
+    // The default result landing page shoppers are redirected to when they
+    // complete a payment on the HPP
+    'resURL',
   ];
 }
 
@@ -315,7 +413,7 @@ function _commerce_adyen_pro_required_option() {
 function _commerce_adyen_pro_signature_calculation(array $data, array $settings, $operation) {
   $sign_data = '';
 
-  switch ($settings['hmac_type']) {
+  switch ($settings['encoding_algorithm']) {
     case 'sha256':
       $escapeval = function($val) {
         return str_replace(':', '\\:', str_replace('\\', '\\\\', $val));
@@ -332,14 +430,15 @@ function _commerce_adyen_pro_signature_calculation(array $data, array $settings,
       $sign_data = implode(':', array_map($escapeval, array_merge(array_keys($data), array_values($data))));
 
       // base64-encode the binary result of the HMAC computation
-      $sign_data = base64_encode(hash_hmac($settings['hmac_type'], $sign_data, pack('H*', $settings['hmac']), TRUE));
+      $sign_data = base64_encode(hash_hmac($settings['encoding_algorithm'], $sign_data, pack('H*', $settings['hmac']), TRUE));
       break;
 
     case 'sha1':
       if ('request' === $operation) {
-        // shopperLocale is passed as a parameter, but it is not used in the
-        // signing string.
+        // "shopperLocale" and "resURL" is passed as a parameter, but it is not
+        // used in the signing string.
         unset($data['shopperLocale']);
+        unset($data['resURL']);
 
         //The signature is generated by concatenating the values of a number
         // of the payment session fields.
@@ -362,7 +461,7 @@ function _commerce_adyen_pro_signature_calculation(array $data, array $settings,
       }
 
       // Base64-encode the binary result of the HMAC computation.
-      $sign_data = base64_encode(pack('H*', hash_hmac($settings['hmac_type'], $sign_data, $settings['hmac'])));
+      $sign_data = base64_encode(pack('H*', hash_hmac($settings['encoding_algorithm'], $sign_data, $settings['hmac'])));
       break;
   }
 
@@ -374,12 +473,25 @@ function _commerce_adyen_pro_signature_calculation(array $data, array $settings,
  *
  * @param int $is_test
  *   Test server checking.
+ * @param string $operation
+ *   Operation type.
  *
  * @return string
  *   Server URL.
  */
-function _commerce_adyen_pro_server_url($is_test) {
-  return empty($is_test) ? 'https://live.adyen.com/hpp/pay.shtml' : 'https://test.adyen.com/hpp/pay.shtml';
+function _commerce_adyen_pro_server_url($is_test, $operation) {
+  switch ($operation) {
+    case 'create':
+      // @link https://docs.adyen.com/developers/hpp-manual#hppendpoints
+      return empty($is_test) ? 'https://live.adyen.com/hpp/pay.shtml' : 'https://test.adyen.com/hpp/pay.shtml';
+      break;
+
+    case 'capture':
+      // @link https://docs.adyen.com/developers/hpp-manual#hppendpoints
+      return empty($is_test) ? 'https://pal-live.adyen.com/pal/adapter/httppost' : 'https://pal-test.adyen.com/pal/adapter/httppost';
+      break;
+  }
+
 }
 
 /**
@@ -409,8 +521,8 @@ function _commerce_adyen_pro_check_account(array $settings) {
     $result = FALSE;
   }
 
-  if (empty($settings['hmac_type'])) {
-    drupal_set_message(t('You not select HMAC type'), 'error');
+  if (empty($settings['encoding_algorithm'])) {
+    drupal_set_message(t('You not select encoding algorithm'), 'error');
     $result = FALSE;
   }
 
