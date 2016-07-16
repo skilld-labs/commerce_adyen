@@ -11,7 +11,7 @@ Out of the box module provides two types of Adyen response listeners:
 
 To extend by a new one you should:
 
-- Implement a [hook_commerce_adyen_responses()](commerce_adyen.api.php#L30)
+- Implement a [hook_commerce_adyen_responses()](commerce_adyen.api.php#L15)
 - Describe a logic in a class which implements the [\Commerce\Adyen\ResponseInterface](adyen/ResponseInterface.inc)
 
 In action:
