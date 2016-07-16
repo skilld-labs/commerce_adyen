@@ -8,4 +8,5 @@ configure = admin/commerce/config/payment-methods/manage/commerce_payment_commer
 
 autoload[adyen][] = Commerce\Adyen
 
+dependencies[] = autoload
 dependencies[] = commerce_payment
