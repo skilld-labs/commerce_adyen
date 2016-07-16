@@ -5,21 +5,6 @@
  */
 
 /**
- * Allow alter the data used to create redirect form to Adyen.
- *
- * @param \Commerce\Adyen\Request\Payment $payment
- *   The data used to create redirect form.
- * @param \stdClass $order
- *   The full order object the redirect form is being generated for.
- *
- * @see commerce_adyen_redirect_form()
- */
-function hook_commerce_adyen_payment_request_alter(\Commerce\Adyen\Request\Payment $payment, \stdClass $order) {
-  $payment->setSessionValidity(strtotime('+ 2 hour'));
-  $payment->setShopperLocale(user_load($order->uid)->language);
-}
-
-/**
  * Register Adyen response types.
  *
  * @see commerce_adyen_responses()
@@ -32,6 +17,21 @@ function hook_commerce_adyen_responses() {
     \Commerce\Adyen\Response\Payment::class,
     \Commerce\Adyen\Response\Notification::class,
   ];
+}
+
+/**
+ * Allow alter the data used to create redirect form to Adyen.
+ *
+ * @param \Commerce\Adyen\Request\Payment $payment
+ *   The data used to create redirect form.
+ * @param \stdClass $order
+ *   The full order object the redirect form is being generated for.
+ *
+ * @see commerce_adyen_redirect_form()
+ */
+function hook_commerce_adyen_payment_request_alter(\Commerce\Adyen\Request\Payment $payment, \stdClass $order) {
+  $payment->setSessionValidity(strtotime('+ 2 hour'));
+  $payment->setShopperLocale(user_load($order->uid)->language);
 }
 
 /**
