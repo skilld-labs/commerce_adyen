@@ -4,8 +4,6 @@
  * Adyen payment.
  */
 
-use Commerce\Adyen;
-
 /**
  * Implements PAYMENT_METHOD_BASE_settings_form().
  *
@@ -30,8 +28,8 @@ function commerce_adyen_settings_form(array $settings) {
     '#title' => t('Mode'),
     '#default_value' => 'test',
     '#options' => [
-      'test' => t('Test'),
-      'live' => t('Live'),
+      \Adyen\Environment::TEST => t('Test'),
+      \Adyen\Environment::LIVE => t('Live'),
     ],
   ];
 
@@ -143,11 +141,11 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
 
     // Payment fields.
     // @link https://docs.adyen.com/developers/hpp-manual#hpppaymentfields
-    $payment = new Adyen\Request\Payment();
+    $payment = new \Commerce\Adyen\Request\Payment();
     $payment->setPaymentAmount($order_wrapper->commerce_order_total->amount->value());
     $payment->setCurrencyCode($order_wrapper->commerce_order_total->currency_code->value());
     $payment->setMerchantAccount($payment_method['settings']['merchant_account']);
-    $payment->setMerchantReference($order->order_numnber);
+    $payment->setMerchantReference($order->order_number);
     $payment->setSkinCode($payment_method['settings']['skin_code']);
     $payment->setSessionValidity(strtotime('+1 hour'));
     $payment->setShopperEmail($order->mail);
@@ -159,7 +157,7 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
     drupal_alter('commerce_adyen_payment_request', $payment, $order);
 
     // @todo Why we sign it here and unset a value on "#pre_render"?
-    $payment->signRequest($payment_method['settings']['algorithm'], $payment_method['settings']['hamc']);
+    $payment->signRequest($payment_method['settings']['algorithm'], $payment_method['settings']['hmac']);
 
     foreach ($payment as $name => $value) {
       $form[$name] = [
@@ -191,11 +189,13 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
  * @internal
  */
 function commerce_adyen_pre_render_redirect_form(array $form) {
+  // Remove Drupal fields from a form (such as "form_token", "form_id" etc).
+  // This needs to be done since Adyen will generate a signature from submitted
+  // data and will expect only those fields which described in API. Any other
+  // data will lead to wrong signature of payment request.
   foreach (array_diff(element_children($form), array_keys($form['#payment'])) as $name) {
     unset($form[$name]);
   }
-
-  unset($form['merchantSig']);
 
   return $form;
 }
@@ -209,5 +209,5 @@ function commerce_adyen_pre_render_redirect_form(array $form) {
  *   Response URL.
  */
 function commerce_adyen_payment_response_url() {
-  return url(COMMERCE_ADYEN_BASE_URL . '/' . Adyen\Response\Payment::type(), ['absolute' => TRUE]);
+  return url(COMMERCE_ADYEN_BASE_URL . '/' . \Commerce\Adyen\Response\Payment::type(), ['absolute' => TRUE]);
 }
