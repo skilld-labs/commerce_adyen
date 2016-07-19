@@ -56,7 +56,7 @@ class Payment implements ResponseInterface {
 
     $payment_method = commerce_payment_method_instance_load(COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE);
     // Create signature from a raw data.
-    $payment_signature = commerce_adyen_hmac_signature(
+    $payment_signature = commerce_adyen_sha_signature(
       $data,
       $payment_method['settings']['algorithm'],
       $payment_method['settings']['hmac'],
@@ -78,8 +78,8 @@ class Payment implements ResponseInterface {
     switch ($this->data->authResult) {
       case 'authorised':
         $transaction = $this->createTransaction();
-        $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
-        $transaction->message = t('Payment has been completed.');
+        $transaction->status = COMMERCE_PAYMENT_STATUS_PENDING;
+        $transaction->message = t('Payment has been successfully authorized.');
         break;
 
       case 'pending':

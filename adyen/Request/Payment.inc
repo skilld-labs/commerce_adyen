@@ -133,7 +133,7 @@ class Payment implements \Iterator {
    *   HMAC signature from Adyen backend.
    */
   public function signRequest($algorithm, $hmac) {
-    $this->data['merchantSig'] = commerce_adyen_hmac_signature($this->data, $algorithm, $hmac, 'request');
+    $this->data['merchantSig'] = commerce_adyen_sha_signature($this->data, $algorithm, $hmac, 'request');
   }
 
   /**
