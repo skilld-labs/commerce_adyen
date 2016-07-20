@@ -1,0 +1,196 @@
+<?php
+/**
+ * @file
+ * Commerce Adyen.
+ */
+
+define('COMMERCE_ADYEN_BASE_URL', 'commerce/adyen');
+define('COMMERCE_ADYEN_PAYMENT_METHOD', 'commerce_adyen');
+define('COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE', sprintf('%s|commerce_payment_%1$s', COMMERCE_ADYEN_PAYMENT_METHOD));
+define('COMMERCE_ADYEN_PAYMENT_STATE_CAPTURED', 'captured');
+define('COMMERCE_ADYEN_PAYMENT_STATE_AUTHORISED', 'authorised');
+
+/**
+ * Implements hook_menu().
+ */
+function commerce_adyen_menu() {
+  $info = [];
+
+  // For "response" we will have GET request and "POST" for "notification".
+  $info[COMMERCE_ADYEN_BASE_URL] = [
+    'type' => MENU_CALLBACK,
+    'file' => 'includes/commerce_adyen.menu.inc',
+    'page callback' => 'commerce_adyen_controller',
+    'delivery callback' => 'commerce_adyen_deliver',
+    'page arguments' => [count(explode('/', COMMERCE_ADYEN_BASE_URL))],
+    'access arguments' => TRUE,
+  ];
+
+  return $info;
+}
+
+/**
+ * Implements hook_commerce_payment_method_info().
+ */
+function commerce_adyen_commerce_payment_method_info() {
+  $info = [];
+
+  $info[COMMERCE_ADYEN_PAYMENT_METHOD] = [
+    'file' => 'includes/commerce_adyen.payment.inc',
+    'title' => 'Adyen',
+    'description' => t('Redirect users to submit payments through Adyen.'),
+    'active' => TRUE,
+    'terminal' => FALSE,
+    'offsite' => TRUE,
+    'offsite_autoredirect' => TRUE,
+  ];
+
+  return $info;
+}
+
+/**
+ * Implements hook_commerce_adyen_responses().
+ */
+function commerce_adyen_commerce_adyen_responses() {
+  return [
+    \Commerce\Adyen\Response\Payment::class,
+    \Commerce\Adyen\Response\Notification::class,
+  ];
+}
+
+/**
+ * Collect Adyen response types.
+ *
+ * @see hook_commerce_adyen_responses()
+ *
+ * @return \Commerce\Adyen\ResponseInterface[]
+ *   A list of response types.
+ */
+function commerce_adyen_responses() {
+  /* @var \Commerce\Adyen\ResponseInterface[] $requests */
+  $requests = module_invoke_all(__FUNCTION__);
+
+  // Remove duplicates.
+  array_unique($requests);
+
+  foreach ($requests as $i => $class) {
+    unset($requests[$i]);
+
+    if (isset(class_implements($class)[\Commerce\Adyen\ResponseInterface::class])) {
+      $requests[$class::type()] = $class;
+    }
+  }
+
+  return $requests;
+}
+
+/**
+ * Returns the URL of Adyen endpoint.
+ *
+ * @param string $mode
+ *   Allowed values are: "test" and "live".
+ * @param string $operation
+ *   Operation type.
+ *
+ * @return string
+ *   Server URL.
+ */
+function commerce_adyen_url($mode, $operation) {
+  switch ($operation) {
+    // @link https://docs.adyen.com/developers/hpp-manual#hppendpoints
+    case 'create':
+      return "https://$mode.adyen.com/hpp/pay.shtml";
+
+    // @link https://docs.adyen.com/developers/hpp-manual#hppendpoints
+    case 'capture':
+      return "https://pal-$mode.adyen.com/pal/adapter/httppost";
+  }
+
+  throw new \RuntimeException(t('Operation is not supported!'));
+}
+
+/**
+ * Calculate merchant signature.
+ *
+ * @param array $data
+ *   Payment data.
+ * @param string $hmac
+ *   HMAC signature from Adyen backend.
+ *
+ * @return string
+ *   Merchant signature.
+ */
+function commerce_adyen_sha_signature(array $data, $hmac) {
+  // @todo Why "merchantSig" could be here?
+  unset($data['merchantSig']);
+
+  return \Adyen\Util\Util::calculateSha256Signature($hmac, $data);
+}
+
+/**
+ * Capture request. Used as callback for action of a "rules".
+ *
+ * @todo Should this function be more generic?
+ * @see commerce_adyen_rules_action_info()
+ *
+ * @param \stdClass $order
+ *   Commerce order.
+ *
+ * @return bool|\stdClass
+ *   Payment transaction object or FALSE if there is no Adyen transaction.
+ */
+function commerce_adyen_capture_request(\stdClass $order) {
+  $payment_transactions = commerce_payment_transaction_load_multiple([], [
+    'order_id' => $order->order_id,
+    'instance_id' => COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE,
+    'remote_status' => COMMERCE_ADYEN_PAYMENT_STATE_AUTHORISED,
+    'payment_method' => COMMERCE_ADYEN_PAYMENT_METHOD,
+  ]);
+
+  // If an array is empty (transaction with specified criteria does not exists)
+  // then calling "reset()" on "$payment_transactions" will return "FALSE".
+  $payment_transaction = reset($payment_transactions);
+
+  if (FALSE !== $payment_transaction) {
+    $payment_method = commerce_payment_method_instance_load($payment_transaction->instance_id);
+
+    $client = new \Adyen\Client();
+    $client->setUsername($payment_method['settings']['client_user']);
+    $client->setPassword($payment_method['settings']['client_password']);
+    $client->setEnvironment($payment_method['settings']['mode']);
+
+    try {
+      $result = (new \Adyen\Service\Modification($client))->capture([
+        'merchantAccount' => $payment_method['settings']['merchant_account'],
+        'originalReference' => $payment_transaction->remote_id,
+        'modificationAmount' => [
+          'currency' => $payment_transaction->currency_code,
+          'value' => $payment_transaction->amount,
+        ],
+      ]);
+
+      if ('[capture-received]' === $result['response']) {
+        $payment_transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+        $payment_transaction->remote_status = COMMERCE_ADYEN_PAYMENT_STATE_CAPTURED;
+        $payment_transaction->message = t('Payment has been captured and completed.');
+      }
+      else {
+        // @todo Can we throw "\Adyen\AdyenException" exception here to set
+        // status to failure?
+        $payment_transaction->message = t('Payment has not been captured and completed with message: @message.', [
+          '@message' => $result['response'],
+        ]);
+      }
+    }
+    catch (\Adyen\AdyenException $exception) {
+      watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $exception);
+
+      $payment_transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+      $payment_transaction->message = $exception->getMessage();
+    }
+
+    commerce_payment_transaction_save($payment_transaction);
+  }
+
+  return $payment_transaction;
+}
