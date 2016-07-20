@@ -155,7 +155,8 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
       ];
     }
 
-    $form['#action'] = commerce_adyen_url($payment_method['settings']['mode'], 'create');
+    // @link https://docs.adyen.com/developers/hpp-manual#hppendpoints
+    $form['#action'] = sprintf('https://%s.adyen.com/hpp/pay.shtml', $payment_method['settings']['mode']);
     $form['#payment'] = $payment;
     $form['#pre_render'][] = 'commerce_adyen_pre_render_redirect_form';
 
