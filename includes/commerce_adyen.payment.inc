@@ -144,6 +144,7 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
     $payment->setResUrl(commerce_adyen_payment_response_url());
 
     // Allow modules to alter parameters of the request.
+    // @see hook_commerce_adyen_payment_request_alter()
     drupal_alter('commerce_adyen_payment_request', $payment, $order);
 
     $payment->signRequest($payment_method['settings']['hmac']);
