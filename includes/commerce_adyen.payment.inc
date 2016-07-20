@@ -56,16 +56,6 @@ function commerce_adyen_settings_form(array $settings) {
     '#title' => t('Skin Code'),
   ];
 
-  $form['algorithm'] = [
-    '#type' => 'select',
-    '#title' => t('Encoding algorithm'),
-    '#default_value' => 'sha256',
-    '#options' => [
-      'sha1' => 'SHA1',
-      'sha256' => 'SHA256',
-    ],
-  ];
-
   $form['hmac'] = [
     '#type' => 'textfield',
     '#title' => t('HMAC'),
@@ -151,13 +141,12 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
     $payment->setShopperEmail($order->mail);
     $payment->setShopperLocale($payment_method['settings']['shopper_locale']);
     $payment->setMerchantReturnData($order->data['payment_redirect_key']);
-    $payment->setResURL(commerce_adyen_payment_response_url());
+    $payment->setResUrl(commerce_adyen_payment_response_url());
 
     // Allow modules to alter parameters of the request.
     drupal_alter('commerce_adyen_payment_request', $payment, $order);
 
-    // @todo Why we sign it here and unset a value on "#pre_render"?
-    $payment->signRequest($payment_method['settings']['algorithm'], $payment_method['settings']['hmac']);
+    $payment->signRequest($payment_method['settings']['hmac']);
 
     foreach ($payment as $name => $value) {
       $form[$name] = [
@@ -193,7 +182,7 @@ function commerce_adyen_pre_render_redirect_form(array $form) {
   // This needs to be done since Adyen will generate a signature from submitted
   // data and will expect only those fields which described in API. Any other
   // data will lead to wrong signature of payment request.
-  foreach (array_diff(element_children($form), array_keys($form['#payment'])) as $name) {
+  foreach (array_diff(element_children($form), array_keys(iterator_to_array($form['#payment']))) as $name) {
     unset($form[$name]);
   }
 

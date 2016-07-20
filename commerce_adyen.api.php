@@ -38,6 +38,7 @@ function hook_commerce_adyen_payment_request_alter(\Commerce\Adyen\Request\Payme
  * React on a notification from Adyen.
  *
  * @link https://docs.adyen.com/developers/api-manual#notificationfields
+ *
  * @see \Commerce\Adyen\Response\Notification::__construct()
  *
  * @param string $event_code

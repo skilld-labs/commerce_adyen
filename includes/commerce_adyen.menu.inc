@@ -7,10 +7,10 @@
 /**
  * Menu route controller.
  *
- * @see commerce_adyen_menu()
- *
  * @param string $type
  *   Type of response from Adyen.
+ *
+ * @see commerce_adyen_menu()
  *
  * @return string
  *   Processing result.
@@ -36,10 +36,10 @@ function commerce_adyen_controller($type) {
 /**
  * Menu route delivery.
  *
- * @see drupal_deliver_html_page()
- *
  * @param string $response
  *   Response from callback.
+ *
+ * @see drupal_deliver_html_page()
  */
 function commerce_adyen_deliver($response) {
   // Do not trigger complex logic of default delivery callback.

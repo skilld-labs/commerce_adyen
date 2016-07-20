@@ -56,12 +56,7 @@ class Payment implements ResponseInterface {
 
     $payment_method = commerce_payment_method_instance_load(COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE);
     // Create signature from a raw data.
-    $payment_signature = commerce_adyen_sha_signature(
-      $data,
-      $payment_method['settings']['algorithm'],
-      $payment_method['settings']['hmac'],
-      'response'
-    );
+    $payment_signature = commerce_adyen_sha_signature($data, $payment_method['settings']['hmac']);
 
     if ($payment_signature !== $this->data->merchantSig) {
       throw new Exception(t('Received Adyen response with invalid HMAC signature.'));

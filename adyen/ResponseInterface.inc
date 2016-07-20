@@ -46,10 +46,10 @@ interface ResponseInterface {
   /**
    * ResponseInterface constructor.
    *
-   * @see commerce_adyen_controller()
-   *
    * @param array $data
    *   The "$_REQUEST" superglobal variable will be passed.
+   *
+   * @see commerce_adyen_controller()
    */
   public function __construct(array $data);
 

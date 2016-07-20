@@ -14,7 +14,9 @@ namespace Commerce\Adyen\Request;
 class Payment implements \Iterator {
 
   /**
-   * @var array
+   * Data for payment request.
+   *
+   * @var string[]
    */
   private $data = [];
 
@@ -41,11 +43,11 @@ class Payment implements \Iterator {
   /**
    * Set merchant reference.
    *
-   * @example
-   * $payment->setMerchantReference('DE-LW-2013');
-   *
    * @param string $merchant_reference
    *   Merchant reference.
+   *
+   * @example
+   * $payment->setMerchantReference('DE-LW-2013');
    */
   public function setMerchantReference($merchant_reference) {
     $this->data['merchantReference'] = $merchant_reference;
@@ -120,20 +122,18 @@ class Payment implements \Iterator {
    *   The default result landing page shoppers are redirected
    *   to when they complete a payment on the HPP.
    */
-  public function setResURL($res_url) {
+  public function setResUrl($res_url) {
     $this->data['resURL'] = $res_url;
   }
 
   /**
    * Sign payment request.
    *
-   * @param string $algorithm
-   *   Of of available algorithms.
    * @param string $hmac
    *   HMAC signature from Adyen backend.
    */
-  public function signRequest($algorithm, $hmac) {
-    $this->data['merchantSig'] = commerce_adyen_sha_signature($this->data, $algorithm, $hmac, 'request');
+  public function signRequest($hmac) {
+    $this->data['merchantSig'] = commerce_adyen_sha_signature($this->data, $hmac);
   }
 
   /**
