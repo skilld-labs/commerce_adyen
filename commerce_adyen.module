@@ -85,31 +85,6 @@ function commerce_adyen_responses() {
 }
 
 /**
- * Returns the URL of Adyen endpoint.
- *
- * @param string $mode
- *   Allowed values are: "test" and "live".
- * @param string $operation
- *   Operation type.
- *
- * @return string
- *   Server URL.
- */
-function commerce_adyen_url($mode, $operation) {
-  switch ($operation) {
-    // @link https://docs.adyen.com/developers/hpp-manual#hppendpoints
-    case 'create':
-      return "https://$mode.adyen.com/hpp/pay.shtml";
-
-    // @link https://docs.adyen.com/developers/hpp-manual#hppendpoints
-    case 'capture':
-      return "https://pal-$mode.adyen.com/pal/adapter/httppost";
-  }
-
-  throw new \RuntimeException(t('Operation is not supported!'));
-}
-
-/**
  * Calculate merchant signature.
  *
  * @param array $data
@@ -121,7 +96,8 @@ function commerce_adyen_url($mode, $operation) {
  *   Merchant signature.
  */
 function commerce_adyen_sha_signature(array $data, $hmac) {
-  // @todo Why "merchantSig" could be here?
+  // Ensure that we not have already created signature.
+  // @see https://github.com/Adyen/php/blob/master/1.HPP/SHA-256/check-payment-request-sha256.php#L69
   unset($data['merchantSig']);
 
   return \Adyen\Util\Util::calculateSha256Signature($hmac, $data);
