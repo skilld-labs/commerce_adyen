@@ -6,12 +6,14 @@
 
 namespace Commerce\Adyen\Request;
 
+use Commerce\Adyen\SignatureInterface;
+
 /**
  * Class Payment.
  *
  * @package Commerce\Adyen\Request
  */
-class Payment implements \Iterator {
+class Payment implements \Iterator, SignatureInterface {
 
   /**
    * Data for payment request.
@@ -19,6 +21,31 @@ class Payment implements \Iterator {
    * @var string[]
    */
   private $data = [];
+
+  /**
+   * Payment constructor.
+   */
+  public function __construct() {
+    $this->data = array_fill_keys(static::signatureFields(), '');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function signatureFields() {
+    return [
+      'resURL',
+      'skinCode',
+      'currencyCode',
+      'shopperEmail',
+      'shopperLocale',
+      'paymentAmount',
+      'merchantAccount',
+      'sessionValidity',
+      'merchantReference',
+      'merchantReturnData',
+    ];
+  }
 
   /**
    * Set amount of a payment.
@@ -31,6 +58,16 @@ class Payment implements \Iterator {
   }
 
   /**
+   * Returns amount of a payment.
+   *
+   * @return string
+   *   Amount of a payment.
+   */
+  public function getPaymentAmount() {
+    return $this->data['paymentAmount'];
+  }
+
+  /**
    * Set currency code.
    *
    * @param string $currency_code
@@ -38,6 +75,16 @@ class Payment implements \Iterator {
    */
   public function setCurrencyCode($currency_code) {
     $this->data['currencyCode'] = $currency_code;
+  }
+
+  /**
+   * Returns currency code.
+   *
+   * @return string
+   *   Currency code.
+   */
+  public function getCurrencyCode() {
+    return $this->data['currencyCode'];
   }
 
   /**
@@ -54,6 +101,16 @@ class Payment implements \Iterator {
   }
 
   /**
+   * Returns merchant reference.
+   *
+   * @return string
+   *   Merchant reference.
+   */
+  public function getMerchantReference() {
+    return $this->data['merchantReference'];
+  }
+
+  /**
    * Set skin code.
    *
    * @param string $skin_code
@@ -61,6 +118,16 @@ class Payment implements \Iterator {
    */
   public function setSkinCode($skin_code) {
     $this->data['skinCode'] = $skin_code;
+  }
+
+  /**
+   * Returns skin code.
+   *
+   * @return string
+   *   Skin code.
+   */
+  public function getSkinCode() {
+    return $this->data['skinCode'];
   }
 
   /**
@@ -74,6 +141,16 @@ class Payment implements \Iterator {
   }
 
   /**
+   * Returns merchant account.
+   *
+   * @return string
+   *   Merchant account.
+   */
+  public function getMerchantAccount() {
+    return $this->data['merchantAccount'];
+  }
+
+  /**
    * Set session validity.
    *
    * @param int $session_validity
@@ -84,6 +161,16 @@ class Payment implements \Iterator {
   }
 
   /**
+   * Returns session validity.
+   *
+   * @return string
+   *   Session validity.
+   */
+  public function getSessionValidity() {
+    return $this->data['sessionValidity'];
+  }
+
+  /**
    * Set shopper email.
    *
    * @param string $shopper_email
@@ -91,6 +178,16 @@ class Payment implements \Iterator {
    */
   public function setShopperEmail($shopper_email) {
     $this->data['shopperEmail'] = $shopper_email;
+  }
+
+  /**
+   * Returns shopper email.
+   *
+   * @return string
+   *   Shopper email.
+   */
+  public function getShopperEmail() {
+    return $this->data['shopperEmail'];
   }
 
   /**
@@ -105,6 +202,16 @@ class Payment implements \Iterator {
   }
 
   /**
+   * Returns return data.
+   *
+   * @return string
+   *   Return data.
+   */
+  public function getMerchantReturnData() {
+    return $this->data['merchantReturnData'];
+  }
+
+  /**
    * Set shopper locale.
    *
    * @param string $shopper_locale
@@ -113,6 +220,16 @@ class Payment implements \Iterator {
    */
   public function setShopperLocale($shopper_locale) {
     $this->data['shopperLocale'] = $shopper_locale;
+  }
+
+  /**
+   * Returns shopper locale.
+   *
+   * @return string
+   *   Shopper locale.
+   */
+  public function getShopperLocale() {
+    return $this->data['shopperLocale'];
   }
 
   /**
@@ -127,13 +244,23 @@ class Payment implements \Iterator {
   }
 
   /**
+   * Returns response URL.
+   *
+   * @return string
+   *   Response URL.
+   */
+  public function getResUrl() {
+    return $this->data['resURL'];
+  }
+
+  /**
    * Sign payment request.
    *
    * @param string $hmac
    *   HMAC signature from Adyen backend.
    */
   public function signRequest($hmac) {
-    $this->data['merchantSig'] = commerce_adyen_sha_signature($this->data, $hmac);
+    $this->data['merchantSig'] = commerce_adyen_sha_signature($this->data, $hmac, $this);
   }
 
   /**
