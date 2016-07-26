@@ -30,6 +30,19 @@ function commerce_adyen_menu() {
 }
 
 /**
+ * Menu route delivery.
+ *
+ * @param string $response
+ *   Response from callback.
+ *
+ * @see drupal_deliver_html_page()
+ */
+function commerce_adyen_deliver($response) {
+  // Do not trigger complex logic of default delivery callback.
+  print $response;
+}
+
+/**
  * Implements hook_commerce_payment_method_info().
  */
 function commerce_adyen_commerce_payment_method_info() {
