@@ -23,7 +23,7 @@ function commerce_adyen_menu() {
     'page callback' => 'commerce_adyen_controller',
     'delivery callback' => 'commerce_adyen_deliver',
     'page arguments' => [count(explode('/', COMMERCE_ADYEN_BASE_URL))],
-    'access arguments' => TRUE,
+    'access callback' => TRUE,
   ];
 
   return $info;
