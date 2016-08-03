@@ -32,16 +32,3 @@ function commerce_adyen_controller($type) {
 
   return $response;
 }
-
-/**
- * Menu route delivery.
- *
- * @param string $response
- *   Response from callback.
- *
- * @see drupal_deliver_html_page()
- */
-function commerce_adyen_deliver($response) {
-  // Do not trigger complex logic of default delivery callback.
-  print $response;
-}

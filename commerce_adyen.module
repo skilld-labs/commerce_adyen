@@ -182,3 +182,19 @@ function commerce_adyen_capture_request(\stdClass $order) {
 
   return $payment_transaction;
 }
+
+/**
+ * Menu route delivery.
+ *
+ * @internal
+ *
+ * @param string $response
+ *   Response from callback.
+ *
+ * @see commerce_adyen_menu()
+ * @see drupal_deliver_html_page()
+ */
+function commerce_adyen_deliver($response) {
+  // Do not trigger complex logic of default delivery callback.
+  print $response;
+}
