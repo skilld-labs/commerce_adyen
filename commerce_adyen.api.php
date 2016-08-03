@@ -43,12 +43,13 @@ function hook_commerce_adyen_payment_request_alter(\Commerce\Adyen\Request\Payme
  *
  * @param string $event_code
  *   One of event codes in a lowercase.
+ * @param \stdClass $order
+ *   Commerce order.
  * @param array $data
- *   Submitted data.
+ *   Received data.
  */
-function hook_commerce_adyen_notification($event_code, array $data) {
+function hook_commerce_adyen_notification($event_code, \stdClass $order, array $data) {
   if ('cancellation' === $event_code) {
-    $order = commerce_order_load_by_number($data['merchantReference']);
     $transactions = commerce_payment_transaction_load_multiple([], [
       'order_id' => $order->order_id,
       'instance_id' => COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE,
@@ -57,6 +58,8 @@ function hook_commerce_adyen_notification($event_code, array $data) {
 
     $transaction = reset($transactions);
     $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+
     commerce_payment_transaction_save($transaction);
+    commerce_order_status_update($order, 'canceled');
   }
 }

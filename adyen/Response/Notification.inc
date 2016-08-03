@@ -43,8 +43,13 @@ class Notification implements ResponseInterface {
     }
 
     $data['eventCode'] = strtolower($data['eventCode']);
+    $order = commerce_order_load_by_number($data['merchantReference']);
 
-    module_invoke_all('commerce_adyen_notification', $data['eventCode'], $data);
+    if (empty($order->order_id)) {
+      throw new Exception(t('Incorrect merchant reference has been sent by Adyen in notification.'));
+    }
+
+    module_invoke_all('commerce_adyen_notification', $data['eventCode'], $order, $data);
   }
 
 }
