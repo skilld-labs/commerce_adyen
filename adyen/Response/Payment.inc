@@ -8,13 +8,14 @@ namespace Commerce\Adyen\Response;
 
 use Commerce\Adyen\Exception;
 use Commerce\Adyen\ResponseInterface;
+use Commerce\Adyen\SignatureInterface;
 
 /**
  * Class Payment.
  *
  * @package Commerce\Adyen\Response
  */
-class Payment implements ResponseInterface {
+class Payment implements ResponseInterface, SignatureInterface {
 
   /**
    * Input data.
@@ -46,6 +47,22 @@ class Payment implements ResponseInterface {
   /**
    * {@inheritdoc}
    */
+  public static function signatureFields() {
+    return [
+      'authResult',
+      'pspReference',
+      'merchantReference',
+      'skinCode',
+      'paymentMethod',
+      'shopperLocale',
+      'merchantReturnData',
+      'additionalData',
+    ];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function __construct(array $data) {
     if (empty($data)) {
       throw new Exception(t('Empty response from Adyen has been received.'));
@@ -56,7 +73,7 @@ class Payment implements ResponseInterface {
 
     $payment_method = commerce_payment_method_instance_load(COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE);
     // Create signature from a raw data.
-    $payment_signature = commerce_adyen_sha_signature($data, $payment_method['settings']['hmac']);
+    $payment_signature = commerce_adyen_sha_signature($data, $payment_method['settings']['hmac'], $this);
 
     if ($payment_signature !== $this->data->merchantSig) {
       throw new Exception(t('Received Adyen response with invalid HMAC signature.'));

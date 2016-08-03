@@ -91,16 +91,28 @@ function commerce_adyen_responses() {
  *   Payment data.
  * @param string $hmac
  *   HMAC signature from Adyen backend.
+ * @param \Commerce\Adyen\SignatureInterface $signature
+ *   An object which has fields for signature creation.
  *
  * @return string
  *   Merchant signature.
  */
-function commerce_adyen_sha_signature(array $data, $hmac) {
-  // Ensure that we not have already created signature.
-  // @see https://github.com/Adyen/php/blob/master/1.HPP/SHA-256/check-payment-request-sha256.php#L69
-  unset($data['merchantSig']);
+function commerce_adyen_sha_signature(array $data, $hmac, \Commerce\Adyen\SignatureInterface $signature = NULL) {
+  $values = [];
 
-  return \Adyen\Util\Util::calculateSha256Signature($hmac, $data);
+  if (NULL !== $signature) {
+    foreach ($signature::signatureFields() as $field) {
+      // @todo fire exception if we miss some required fields.
+      if (!empty($data[$field])) {
+        $values[$field] = $data[$field];
+      }
+    }
+  }
+  else {
+    $values = $data;
+  }
+
+  return \Adyen\Util\Util::calculateSha256Signature($hmac, $values);
 }
 
 /**

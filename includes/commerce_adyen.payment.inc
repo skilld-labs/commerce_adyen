@@ -128,6 +128,7 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
   else {
     /* @var \EntityDrupalWrapper $order_wrapper */
     $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+    $redirect_available = TRUE;
 
     // Payment fields.
     // @link https://docs.adyen.com/developers/hpp-manual#hpppaymentfields
@@ -147,7 +148,14 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
     // @see hook_commerce_adyen_payment_request_alter()
     drupal_alter('commerce_adyen_payment_request', $payment, $order);
 
-    $payment->signRequest($payment_method['settings']['hmac']);
+    try {
+      $payment->signRequest($payment_method['settings']['hmac']);
+    }
+    catch (\Exception $e) {
+      watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
+      drupal_set_message($e->getMessage(), 'error');
+      $redirect_available = FALSE;
+    }
 
     foreach ($payment as $name => $value) {
       $form[$name] = [
@@ -164,6 +172,7 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
     $form['submit'] = [
       '#type' => 'submit',
       '#value' => t('Proceed to Adyen'),
+      '#disabled' => !$redirect_available,
     ];
   }
 
