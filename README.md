@@ -105,7 +105,7 @@ And, when Adyen sends a notification to us, you can react on it:
 /**
  * Implements hook_commerce_adyen_notification().
  */
-function MODULE_commerce_adyen_notification() {
+function MODULE_commerce_adyen_notification($event_code, array $data) {
   if ('cancellation' === $event_code) {
     $order = commerce_order_load_by_number($data['merchantReference']);
     $transactions = commerce_payment_transaction_load_multiple([], [
