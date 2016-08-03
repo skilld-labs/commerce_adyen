@@ -121,3 +121,8 @@ function MODULE_commerce_adyen_notification($event_code, \stdClass $order, array
   }
 }
 ```
+
+## Contributors
+
+- Volodymyr Haidamaka (https://www.drupal.org/u/gaydamaka)
+- Alexandr Danilov (https://www.drupal.org/u/alexandrdnlv)
