@@ -18,8 +18,9 @@ function commerce_adyen_settings_form(array $settings) {
   $form = [];
 
   $form['url'] = [
-    '#markup' => t('Use this URL for response from Adyen: @url', [
-      '@url' => commerce_adyen_payment_response_url(),
+    '#markup' => t('Please <a href="@notification_setup" target="_blank">configure your Adyen account</a> to send notifications to this URL: "@notification_url".', [
+      '@notification_setup' => 'https://docs.adyen.com/developers/api-manual#setupnotifications',
+      '@notification_url' => url(COMMERCE_ADYEN_NOTIFICATION_URL, ['absolute' => TRUE]),
     ]),
   ];
 
@@ -37,7 +38,6 @@ function commerce_adyen_settings_form(array $settings) {
     '#type' => 'textfield',
     '#title' => t('Merchant Account'),
     '#description' => t('Do not confuse this with your Adyen account name. You find the right value in the backend in the accounts list.'),
-    '#default_value' => '',
   ];
 
   $form['client_user'] = [
@@ -122,40 +122,14 @@ function commerce_adyen_settings_form(array $settings) {
  * @internal
  */
 function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass $order, array $payment_method) {
-  if (empty($payment_method['settings'])) {
-    drupal_set_message(t('You are not configure Adyen gateway!'), 'error');
-  }
-  else {
-    /* @var \EntityDrupalWrapper $order_wrapper */
-    $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
-    $redirect_available = TRUE;
+  $redirect_available = TRUE;
 
-    // Payment fields.
-    // @link https://docs.adyen.com/developers/hpp-manual#hpppaymentfields
-    $payment = new \Commerce\Adyen\Request\Payment();
-    $payment->setPaymentAmount($order_wrapper->commerce_order_total->amount->value());
-    $payment->setCurrencyCode($order_wrapper->commerce_order_total->currency_code->value());
-    $payment->setMerchantAccount($payment_method['settings']['merchant_account']);
-    $payment->setMerchantReference($order->order_number);
-    $payment->setSkinCode($payment_method['settings']['skin_code']);
-    $payment->setSessionValidity(strtotime('+1 hour'));
-    $payment->setShopperEmail($order->mail);
-    $payment->setShopperLocale($payment_method['settings']['shopper_locale']);
-    $payment->setMerchantReturnData($order->data['payment_redirect_key']);
-    $payment->setResUrl(commerce_adyen_payment_response_url());
-
-    // Allow modules to alter parameters of the request.
-    // @see hook_commerce_adyen_payment_request_alter()
-    drupal_alter('commerce_adyen_payment_request', $payment, $order);
-
-    try {
-      $payment->signRequest($payment_method['settings']['hmac']);
-    }
-    catch (\Exception $e) {
-      watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
-      drupal_set_message($e->getMessage(), 'error');
-      $redirect_available = FALSE;
-    }
+  try {
+    $payment = new \Commerce\Adyen\Payment\Authorization\Request($order, $payment_method);
+    // @see hook_commerce_adyen_payment_authorization_request_alter()
+    drupal_alter('commerce_adyen_payment_authorization_request', $payment, $order, $payment_method);
+    // Sign the request to verify it later.
+    $payment->signRequest();
 
     foreach ($payment as $name => $value) {
       $form[$name] = [
@@ -164,19 +138,84 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
       ];
     }
 
-    // @link https://docs.adyen.com/developers/hpp-manual#hppendpoints
-    $form['#action'] = sprintf('https://%s.adyen.com/hpp/pay.shtml', $payment_method['settings']['mode']);
+    $form['#action'] = $payment->getEndpoint();
     $form['#payment'] = $payment;
-    $form['#pre_render'][] = 'commerce_adyen_pre_render_redirect_form';
-
-    $form['submit'] = [
-      '#type' => 'submit',
-      '#value' => t('Proceed to Adyen'),
-      '#disabled' => !$redirect_available,
-    ];
+    $form['#pre_render'][] = 'commerce_adyen_redirect_form_pre_render';
+  }
+  catch (\Exception $e) {
+    watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
+    drupal_set_message($e->getMessage(), 'error');
+    $redirect_available = FALSE;
   }
 
+  $form['submit'] = [
+    '#type' => 'submit',
+    '#value' => t('Proceed to Adyen'),
+    '#disabled' => !$redirect_available,
+  ];
+
   return $form;
+}
+
+/**
+ * Implements PAYMENT_METHOD_BASE_redirect_form_validate().
+ *
+ * {@inheritdoc}
+ *
+ * @see commerce_adyen_commerce_payment_method_info()
+ * @see commerce_payment_redirect_pane_checkout_form()
+ *
+ * @internal
+ */
+function commerce_adyen_redirect_form_validate(\stdClass $order, array $payment_method) {
+  try {
+    // GET request should be here.
+    $payment = new \Commerce\Adyen\Payment\Authorization\Response($order, $payment_method);
+    $transaction = $payment->getTransaction();
+
+    switch ($payment->getAuthenticationResult()) {
+      case $payment::AUTHORIZED:
+        $transaction->setStatus(COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED);
+        $transaction->setMessage('Payment has been successfully authorized.');
+        break;
+
+      case $payment::PENDING:
+        $transaction->setStatus(COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED);
+        $transaction->setMessage('Payment is pending because final status information is unavailable or shopper needs to take further actions to complete it.');
+        break;
+
+      case $payment::ERROR:
+      case $payment::REFUSED:
+        $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
+        drupal_set_message(t('Payment authorisation was not successful. Please try again.'), 'error');
+        commerce_payment_redirect_pane_previous_page($order);
+        break;
+
+      case $payment::CANCELLED:
+        $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
+        drupal_set_message(t('Payment has been cancelled.'), 'status');
+        commerce_payment_redirect_pane_previous_page($order);
+        break;
+
+      default:
+        throw new \UnexpectedValueException(t('Received Adyen response with invalid "@property" property.', [
+          '@property' => 'authResult',
+        ]));
+    }
+
+    // @see hook_commerce_adyen_payment_authorization_response_alter()
+    drupal_alter('commerce_adyen_payment_authorization_response', $payment, $order, $payment_method);
+
+    $transaction->save();
+  }
+  catch (\Exception $e) {
+    watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
+    drupal_set_message($e->getMessage(), 'error');
+    // We should return boolean indicator since this is unusual form validation.
+    return FALSE;
+  }
+
+  return TRUE;
 }
 
 /**
@@ -184,11 +223,12 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
  *
  * {@inheritdoc}
  *
+ * @see commerce_adyen_redirect_form()
  * @see drupal_render()
  *
  * @internal
  */
-function commerce_adyen_pre_render_redirect_form(array $form) {
+function commerce_adyen_redirect_form_pre_render(array $form) {
   // Remove Drupal fields from a form (such as "form_token", "form_id" etc).
   // This needs to be done since Adyen will generate a signature from submitted
   // data and will expect only those fields which described in API. Any other

@@ -1,19 +1,17 @@
 <?php
 /**
  * @file
- * Adyen payment request.
+ * Payment authorization request.
  */
 
-namespace Commerce\Adyen\Request;
-
-use Commerce\Adyen\SignatureInterface;
+namespace Commerce\Adyen\Payment\Authorization;
 
 /**
- * Class Payment.
+ * Class Request.
  *
- * @package Commerce\Adyen\Request
+ * @package Commerce\Adyen\Payment\Authorization
  */
-class Payment implements \Iterator, SignatureInterface {
+class Request implements SignatureInterface, \Iterator {
 
   /**
    * Data for payment request.
@@ -21,12 +19,58 @@ class Payment implements \Iterator, SignatureInterface {
    * @var string[]
    */
   private $data = [];
+  /**
+   * An array of payment method settings.
+   *
+   * @var array
+   */
+  private $settings = [];
+  /**
+   * Commerce order.
+   *
+   * @var \stdClass
+   */
+  private $order;
 
   /**
-   * Payment constructor.
+   * Request constructor.
+   *
+   * @param \stdClass $order
+   *   Commerce order.
+   * @param array $payment_method
+   *   Payment method information.
    */
-  public function __construct() {
+  public function __construct(\stdClass $order, array $payment_method) {
+    if (empty($payment_method['settings'])) {
+      throw new \UnexpectedValueException(t('You are not configured Adyen payment gateway!'));
+    }
+
     $this->data = array_fill_keys(static::signatureFields(), '');
+    $this->order = $order;
+    $this->settings = $payment_method['settings'];
+
+    $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+    $amount = $order_wrapper->commerce_order_total->amount->value();
+    $currency = $order_wrapper->commerce_order_total->currency_code->value();
+
+    // Adyen documentation says that the "Hungarian Forint" currency consists
+    // of 2 decimal places. But the currency doesn't support decimal places.
+    // So we need to multiply the sum by 100 for the correct data transfer.
+    if ('HUF' === $currency) {
+      $amount *= 100;
+    }
+
+    // Payment fields.
+    // @link https://docs.adyen.com/developers/hpp-manual#hpppaymentfields
+    $this->setMerchantAccount($this->settings['merchant_account']);
+    $this->setMerchantReference($order->order_number);
+    $this->setSkinCode($this->settings['skin_code']);
+    $this->setPaymentAmount($amount);
+    $this->setCurrencyCode($currency);
+    $this->setSessionValidity(strtotime('+ 2 hour'));
+    $this->setShopperEmail($order->mail);
+    $this->setShopperLocale($this->settings['shopper_locale']);
+    $this->setMerchantReturnData($order->data['payment_redirect_key']);
   }
 
   /**
@@ -233,34 +277,25 @@ class Payment implements \Iterator, SignatureInterface {
   }
 
   /**
-   * Set response URL.
-   *
-   * @param string $res_url
-   *   The default result landing page shoppers are redirected
-   *   to when they complete a payment on the HPP.
+   * Sign payment request.
    */
-  public function setResUrl($res_url) {
-    $this->data['resURL'] = $res_url;
+  public function signRequest() {
+    // The default result landing page shoppers are redirected to when
+    // they complete a payment on the HPP.
+    $this->data['resURL'] = url('checkout/' . $this->order->order_id . '/payment/return/' . $this->order->data['payment_redirect_key'], ['absolute' => TRUE]);
+    $this->data['merchantSig'] = commerce_adyen_sha_signature($this->data, $this->settings['hmac'], $this);
   }
 
   /**
-   * Returns response URL.
+   * Returns endpoint URL.
+   *
+   * @link https://docs.adyen.com/developers/hpp-manual#hppendpoints
    *
    * @return string
-   *   Response URL.
+   *   Endpoint URL.
    */
-  public function getResUrl() {
-    return $this->data['resURL'];
-  }
-
-  /**
-   * Sign payment request.
-   *
-   * @param string $hmac
-   *   HMAC signature from Adyen backend.
-   */
-  public function signRequest($hmac) {
-    $this->data['merchantSig'] = commerce_adyen_sha_signature($this->data, $hmac, $this);
+  public function getEndpoint() {
+    return sprintf('https://%s.adyen.com/hpp/pay.shtml', $this->settings['mode']);
   }
 
   /**

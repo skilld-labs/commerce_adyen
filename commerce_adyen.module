@@ -4,11 +4,32 @@
  * Commerce Adyen.
  */
 
-define('COMMERCE_ADYEN_BASE_URL', 'commerce/adyen');
+/**
+ * Name of payment method.
+ */
 define('COMMERCE_ADYEN_PAYMENT_METHOD', 'commerce_adyen');
+/**
+ * URL to send notifications to.
+ */
+define('COMMERCE_ADYEN_NOTIFICATION_URL', 'commerce/adyen/notification');
+/**
+ * Name of instances of payment method.
+ */
 define('COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE', sprintf('%s|commerce_payment_%1$s', COMMERCE_ADYEN_PAYMENT_METHOD));
-define('COMMERCE_ADYEN_PAYMENT_STATE_CAPTURED', 'captured');
-define('COMMERCE_ADYEN_PAYMENT_STATE_AUTHORISED', 'authorised');
+/**
+ * Drupal payment status. Do not mix up with "remote_status"!
+ */
+define('COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED', 'authorised');
+/**
+ * Remote status of a payment. Money has been captured.
+ */
+define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_CAPTURED', 'captured');
+/**
+ * Remote status of a payment. Payment authorized on Adyen side.
+ */
+define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED', 'authorised');
+
+use Commerce\Adyen\Payment;
 
 /**
  * Implements hook_menu().
@@ -16,13 +37,11 @@ define('COMMERCE_ADYEN_PAYMENT_STATE_AUTHORISED', 'authorised');
 function commerce_adyen_menu() {
   $info = [];
 
-  // For "payment" we will have GET request and "POST" for "notification".
-  $info[COMMERCE_ADYEN_BASE_URL] = [
+  $info[COMMERCE_ADYEN_NOTIFICATION_URL] = [
     'type' => MENU_CALLBACK,
-    'file' => 'includes/commerce_adyen.menu.inc',
-    'page callback' => 'commerce_adyen_controller',
-    'delivery callback' => 'commerce_adyen_deliver',
-    'page arguments' => [count(explode('/', COMMERCE_ADYEN_BASE_URL))],
+    'file' => 'includes/commerce_adyen.notification.inc',
+    'page callback' => 'commerce_adyen_notification',
+    'delivery callback' => 'commerce_adyen_notification_deliver',
     'access callback' => TRUE,
   ];
 
@@ -49,39 +68,64 @@ function commerce_adyen_commerce_payment_method_info() {
 }
 
 /**
- * Implements hook_commerce_adyen_responses().
+ * Implements hook_commerce_payment_transaction_status_info().
  */
-function commerce_adyen_commerce_adyen_responses() {
-  return [
-    \Commerce\Adyen\Response\Payment::class,
-    \Commerce\Adyen\Response\Notification::class,
-  ];
+function commerce_adyen_commerce_payment_transaction_status_info() {
+  $module_path = drupal_get_path('module', 'commerce_adyen');
+  $info = [];
+
+  foreach ([
+    // Adyen have its own payment workflow: initially payment should get
+    // the authorization confirmation and only then capturing could be
+    // done. This status must be set when Adyen responds to us.
+    COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED => [
+      'title' => t('Authorized'),
+      'total' => TRUE,
+    ],
+  ] as $status => $data) {
+    $info[$status] = $data + [
+      'status' => $status,
+      'icon' => "$module_path/icons/$status.png",
+    ];
+  }
+
+  return $info;
 }
 
 /**
- * Collect Adyen response types.
- *
- * @see hook_commerce_adyen_responses()
- *
- * @return \Commerce\Adyen\ResponseInterface[]
- *   A list of response types.
+ * Implements hook_commerce_adyen_notification().
  */
-function commerce_adyen_responses() {
-  /* @var \Commerce\Adyen\ResponseInterface[] $requests */
-  $requests = module_invoke_all(__FUNCTION__);
+function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $order, \stdClass $data) {
+  switch ($event_code) {
+    case Payment\NotificationInterface::AUTHORISATION:
+      $transaction = new Payment\Transaction($order);
 
-  // Remove duplicates.
-  array_unique($requests);
+      if ($data->success) {
+        $transaction->setStatus(COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED);
+        commerce_payment_redirect_pane_next_page($order);
+      }
+      else {
+        $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
+        commerce_payment_redirect_pane_previous_page($order);
+      }
+      break;
 
-  foreach ($requests as $i => $class) {
-    unset($requests[$i]);
+    case Payment\NotificationInterface::CAPTURE:
+      $transaction = new Payment\Transaction($order);
+      $transaction->finalize();
+      break;
 
-    if (isset(class_implements($class)[\Commerce\Adyen\ResponseInterface::class])) {
-      $requests[$class::type()] = $class;
-    }
+    case Payment\NotificationInterface::CANCELLATION:
+      $transaction = new Payment\Transaction($order);
+      $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
+
+      commerce_order_status_update($order, 'canceled');
+      break;
   }
 
-  return $requests;
+  if (isset($transaction)) {
+    $transaction->save();
+  }
 }
 
 /**
@@ -91,13 +135,15 @@ function commerce_adyen_responses() {
  *   Payment data.
  * @param string $hmac
  *   HMAC signature from Adyen backend.
- * @param \Commerce\Adyen\SignatureInterface $signature
+ * @param Payment\Authorization\SignatureInterface $signature
  *   An object which has fields for signature creation.
  *
  * @return string
  *   Merchant signature.
  */
-function commerce_adyen_sha_signature(array $data, $hmac, \Commerce\Adyen\SignatureInterface $signature = NULL) {
+function commerce_adyen_sha_signature(array $data, $hmac, Payment\Authorization\SignatureInterface $signature = NULL) {
+  // @todo We need to know which fields should be used for creating
+  // signature of authorization request and which - of response.
   $values = [];
 
   if (NULL !== $signature) {
@@ -118,92 +164,66 @@ function commerce_adyen_sha_signature(array $data, $hmac, \Commerce\Adyen\Signat
 /**
  * Capture request. Used as callback for action of a "rules".
  *
- * @todo Should this function be more generic?
  * @see commerce_adyen_rules_action_info()
  *
  * @param \stdClass $order
  *   Commerce order.
  *
- * @return bool|\stdClass
+ * @return Payment\Transaction
  *   Payment transaction object or FALSE if there is no Adyen transaction.
  */
 function commerce_adyen_capture_request(\stdClass $order) {
-  $payment_transactions = commerce_payment_transaction_load_multiple([], [
-    'order_id' => $order->order_id,
-    'instance_id' => COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE,
-    'remote_status' => COMMERCE_ADYEN_PAYMENT_STATE_AUTHORISED,
-    'payment_method' => COMMERCE_ADYEN_PAYMENT_METHOD,
-  ]);
+  $transaction = new Payment\Transaction($order, COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED);
 
-  // If an array is empty (transaction with specified criteria does not exists)
-  // then calling "reset()" on "$payment_transactions" will return "FALSE".
-  $payment_transaction = reset($payment_transactions);
-
-  if (FALSE !== $payment_transaction) {
-    $payment_method = commerce_payment_method_instance_load($payment_transaction->instance_id);
-
-    $client = new \Adyen\Client();
-    $client->setUsername($payment_method['settings']['client_user']);
-    $client->setPassword($payment_method['settings']['client_password']);
-    $client->setEnvironment($payment_method['settings']['mode']);
+  if (!$transaction->isNew()) {
+    $payment_method = $transaction->getPaymentMethod();
 
     try {
-      $result = (new \Adyen\Service\Modification($client))->capture([
+      $client = new \Adyen\Client();
+      $client->setUsername($payment_method['settings']['client_user']);
+      $client->setPassword($payment_method['settings']['client_password']);
+      $client->setEnvironment($payment_method['settings']['mode']);
+
+      $capture = (new \Adyen\Service\Modification($client))->capture([
         'merchantAccount' => $payment_method['settings']['merchant_account'],
-        'originalReference' => $payment_transaction->remote_id,
+        'originalReference' => $transaction->getRemoteId(),
         'modificationAmount' => [
-          'currency' => $payment_transaction->currency_code,
-          'value' => $payment_transaction->amount,
+          'currency' => $transaction->getCurrency(),
+          'value' => $transaction->getAmount(),
         ],
       ]);
 
-      // @todo Does this means that money will be charged 100%?
-      if ('[capture-received]' === $result['response']) {
-        $payment_transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
-        $payment_transaction->remote_status = COMMERCE_ADYEN_PAYMENT_STATE_CAPTURED;
-        $payment_transaction->message = t('Payment has been captured and completed.');
+      if ('[capture-received]' === $capture['response']) {
+        $transaction->finalize();
       }
       else {
-        $payment_transaction->message = t('Payment has not been captured and completed with message: @message.', [
-          '@message' => $result['response'],
+        $transaction->setMessage('Payment has not been captured and completed with response: @response.', [
+          '@response' => $capture['response'],
         ]);
       }
     }
     catch (\Adyen\AdyenException $exception) {
       watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $exception);
 
-      $payment_transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
-      $payment_transaction->message = $exception->getMessage();
+      $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
+      $transaction->setMessage($exception->getMessage());
     }
 
-    commerce_payment_transaction_save($payment_transaction);
+    $transaction->save();
   }
 
-  return $payment_transaction;
+  return $transaction;
 }
 
 /**
- * Returns an URL Adyen will respond to.
- *
- * @return string
- *   Response URL.
- */
-function commerce_adyen_payment_response_url() {
-  return url(COMMERCE_ADYEN_BASE_URL . '/' . \Commerce\Adyen\Response\Payment::type(), ['absolute' => TRUE]);
-}
-
-/**
- * Menu route delivery.
- *
- * @internal
- *
- * @param string $response
- *   Response from callback.
+ * {@inheritdoc}
  *
  * @see commerce_adyen_menu()
  * @see drupal_deliver_html_page()
+ *
+ * @internal
  */
-function commerce_adyen_deliver($response) {
+function commerce_adyen_notification_deliver($response) {
   // Do not trigger complex logic of default delivery callback.
   print $response;
 }

@@ -4,12 +4,12 @@
  * An interface which should be implemented by class which requires signature.
  */
 
-namespace Commerce\Adyen;
+namespace Commerce\Adyen\Payment\Authorization;
 
 /**
- * Class SignatureInterface.
+ * Interface SignatureInterface.
  *
- * @package Commerce\Adyen
+ * @package Commerce\Adyen\Payment\Authorization
  */
 interface SignatureInterface {
 
