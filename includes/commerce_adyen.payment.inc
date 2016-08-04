@@ -199,15 +199,3 @@ function commerce_adyen_pre_render_redirect_form(array $form) {
 
   return $form;
 }
-
-/**
- * Returns an URL Adyen will respond to.
- *
- * @internal
- *
- * @return string
- *   Response URL.
- */
-function commerce_adyen_payment_response_url() {
-  return url(COMMERCE_ADYEN_BASE_URL . '/' . \Commerce\Adyen\Response\Payment::type(), ['absolute' => TRUE]);
-}

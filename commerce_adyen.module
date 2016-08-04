@@ -16,7 +16,7 @@ define('COMMERCE_ADYEN_PAYMENT_STATE_AUTHORISED', 'authorised');
 function commerce_adyen_menu() {
   $info = [];
 
-  // For "response" we will have GET request and "POST" for "notification".
+  // For "payment" we will have GET request and "POST" for "notification".
   $info[COMMERCE_ADYEN_BASE_URL] = [
     'type' => MENU_CALLBACK,
     'file' => 'includes/commerce_adyen.menu.inc',
@@ -27,19 +27,6 @@ function commerce_adyen_menu() {
   ];
 
   return $info;
-}
-
-/**
- * Menu route delivery.
- *
- * @param string $response
- *   Response from callback.
- *
- * @see drupal_deliver_html_page()
- */
-function commerce_adyen_deliver($response) {
-  // Do not trigger complex logic of default delivery callback.
-  print $response;
 }
 
 /**
@@ -170,14 +157,13 @@ function commerce_adyen_capture_request(\stdClass $order) {
         ],
       ]);
 
+      // @todo Does this means that money will be charged 100%?
       if ('[capture-received]' === $result['response']) {
         $payment_transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
         $payment_transaction->remote_status = COMMERCE_ADYEN_PAYMENT_STATE_CAPTURED;
         $payment_transaction->message = t('Payment has been captured and completed.');
       }
       else {
-        // @todo Can we throw "\Adyen\AdyenException" exception here to set
-        // status to failure?
         $payment_transaction->message = t('Payment has not been captured and completed with message: @message.', [
           '@message' => $result['response'],
         ]);
@@ -194,4 +180,30 @@ function commerce_adyen_capture_request(\stdClass $order) {
   }
 
   return $payment_transaction;
+}
+
+/**
+ * Returns an URL Adyen will respond to.
+ *
+ * @return string
+ *   Response URL.
+ */
+function commerce_adyen_payment_response_url() {
+  return url(COMMERCE_ADYEN_BASE_URL . '/' . \Commerce\Adyen\Response\Payment::type(), ['absolute' => TRUE]);
+}
+
+/**
+ * Menu route delivery.
+ *
+ * @internal
+ *
+ * @param string $response
+ *   Response from callback.
+ *
+ * @see commerce_adyen_menu()
+ * @see drupal_deliver_html_page()
+ */
+function commerce_adyen_deliver($response) {
+  // Do not trigger complex logic of default delivery callback.
+  print $response;
 }
