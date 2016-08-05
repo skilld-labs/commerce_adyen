@@ -94,20 +94,29 @@ function commerce_adyen_commerce_payment_transaction_status_info() {
 
 /**
  * Implements hook_commerce_payment_transaction_insert().
+ *
+ * @see commerce_payment_commerce_payment_transaction_insert()
  */
 function commerce_adyen_commerce_payment_transaction_insert(\stdClass $transaction) {
   if ((new Payment\Transaction($transaction->order_id))->isAuthorized()) {
-    // Since we have additional status in a payment workflow and
-    // it's pretty similar to "success" then we need to perform the
-    // same actions as for "success". To not copy-paste the code
-    // from "commerce_payment_commerce_payment_transaction_insert()"
-    // we just temporarily set status to "success" to pass the check
-    // inside the function and execute the logic. Then the status must
-    // be back to original.
-    $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
-    commerce_payment_commerce_payment_transaction_insert($transaction);
-    // Bring back previous status.
-    $transaction->status = COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED;
+    $order = commerce_order_load($transaction->order_id);
+
+    // Then check to make sure the event hasn't been invoked for this order.
+    if (empty($order->data['commerce_payment_order_paid_in_full_invoked'])) {
+      // Check the order balance and invoke the event.
+      $balance = commerce_payment_order_balance($order);
+
+      if (!empty($balance) && $balance['amount'] <= 0) {
+        // Invoke the event including a hook of the same name.
+        rules_invoke_all('commerce_payment_order_paid_in_full', $order, $transaction);
+
+        // Update the order's data array to indicate this just happened.
+        $order->data['commerce_payment_order_paid_in_full_invoked'] = TRUE;
+
+        // Save the updated order.
+        commerce_order_save($order);
+      }
+    }
   }
 }
 
