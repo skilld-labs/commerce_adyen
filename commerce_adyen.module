@@ -218,6 +218,30 @@ function commerce_adyen_capture_request(\stdClass $order) {
 }
 
 /**
+ * Process an amount due to strange behavior regarding some currencies.
+ *
+ * @param int $amount
+ *   Payment amount.
+ * @param string $currency
+ *   Currency code.
+ *
+ * @return int
+ *   Updated amount.
+ */
+function commerce_adyen_amount($amount, $currency) {
+  switch ($currency) {
+    // Adyen documentation says that the "Hungarian Forint" currency consists
+    // of 2 decimal places. But the currency doesn't support decimal places.
+    // So we need to multiply the sum by 100 for the correct data transfer.
+    case 'HUF':
+      $amount *= 100;
+      break;
+  }
+
+  return $amount;
+}
+
+/**
  * {@inheritdoc}
  *
  * @see commerce_adyen_menu()

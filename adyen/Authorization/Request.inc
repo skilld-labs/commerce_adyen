@@ -29,23 +29,15 @@ class Request extends Signature {
     parent::__construct($order, $payment_method);
 
     $order_wrapper = entity_metadata_wrapper('commerce_order', $this->order);
-    $amount = $order_wrapper->commerce_order_total->amount->value();
-    $currency = $order_wrapper->commerce_order_total->currency_code->value();
-
-    // Adyen documentation says that the "Hungarian Forint" currency consists
-    // of 2 decimal places. But the currency doesn't support decimal places.
-    // So we need to multiply the sum by 100 for the correct data transfer.
-    if ('HUF' === $currency) {
-      $amount *= 100;
-    }
+    $order_total = $order_wrapper->commerce_order_total->value();
 
     // Payment fields.
     // @link https://docs.adyen.com/developers/hpp-manual#hpppaymentfields
     $this->setMerchantAccount($this->paymentMethod['settings']['merchant_account']);
     $this->setMerchantReference($this->order->order_number);
     $this->setSkinCode($this->paymentMethod['settings']['skin_code']);
-    $this->setPaymentAmount($amount);
-    $this->setCurrencyCode($currency);
+    $this->setPaymentAmount(commerce_adyen_amount($order_total['amount'], $order_total['currency_code']));
+    $this->setCurrencyCode($order_total['currency_code']);
     $this->setSessionValidity(strtotime('+ 2 hour'));
     $this->setShopperEmail($this->order->mail);
     $this->setShopperLocale($this->paymentMethod['settings']['shopper_locale']);
