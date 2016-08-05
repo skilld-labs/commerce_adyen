@@ -11,26 +11,7 @@ namespace Commerce\Adyen\Payment\Authorization;
  *
  * @package Commerce\Adyen\Payment\Authorization
  */
-class Request implements SignatureInterface, \Iterator {
-
-  /**
-   * Data for payment request.
-   *
-   * @var string[]
-   */
-  private $data = [];
-  /**
-   * An array of payment method settings.
-   *
-   * @var array
-   */
-  private $settings = [];
-  /**
-   * Commerce order.
-   *
-   * @var \stdClass
-   */
-  private $order;
+class Request extends Signature {
 
   /**
    * Request constructor.
@@ -45,11 +26,9 @@ class Request implements SignatureInterface, \Iterator {
       throw new \UnexpectedValueException(t('You are not configured Adyen payment gateway!'));
     }
 
-    $this->data = array_fill_keys(static::signatureFields(), '');
-    $this->order = $order;
-    $this->settings = $payment_method['settings'];
+    parent::__construct($order, $payment_method);
 
-    $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+    $order_wrapper = entity_metadata_wrapper('commerce_order', $this->order);
     $amount = $order_wrapper->commerce_order_total->amount->value();
     $currency = $order_wrapper->commerce_order_total->currency_code->value();
 
@@ -62,21 +41,21 @@ class Request implements SignatureInterface, \Iterator {
 
     // Payment fields.
     // @link https://docs.adyen.com/developers/hpp-manual#hpppaymentfields
-    $this->setMerchantAccount($this->settings['merchant_account']);
-    $this->setMerchantReference($order->order_number);
-    $this->setSkinCode($this->settings['skin_code']);
+    $this->setMerchantAccount($this->paymentMethod['settings']['merchant_account']);
+    $this->setMerchantReference($this->order->order_number);
+    $this->setSkinCode($this->paymentMethod['settings']['skin_code']);
     $this->setPaymentAmount($amount);
     $this->setCurrencyCode($currency);
     $this->setSessionValidity(strtotime('+ 2 hour'));
-    $this->setShopperEmail($order->mail);
-    $this->setShopperLocale($this->settings['shopper_locale']);
-    $this->setMerchantReturnData($order->data['payment_redirect_key']);
+    $this->setShopperEmail($this->order->mail);
+    $this->setShopperLocale($this->paymentMethod['settings']['shopper_locale']);
+    $this->setMerchantReturnData($this->order->data['payment_redirect_key']);
   }
 
   /**
    * {@inheritdoc}
    */
-  public static function signatureFields() {
+  protected function signatureFields() {
     return [
       'resURL',
       'skinCode',
@@ -283,7 +262,7 @@ class Request implements SignatureInterface, \Iterator {
     // The default result landing page shoppers are redirected to when
     // they complete a payment on the HPP.
     $this->data['resURL'] = url('checkout/' . $this->order->order_id . '/payment/return/' . $this->order->data['payment_redirect_key'], ['absolute' => TRUE]);
-    $this->data['merchantSig'] = commerce_adyen_sha_signature($this->data, $this->settings['hmac'], $this);
+    $this->data['merchantSig'] = $this->getSignature();
   }
 
   /**
@@ -295,42 +274,7 @@ class Request implements SignatureInterface, \Iterator {
    *   Endpoint URL.
    */
   public function getEndpoint() {
-    return sprintf('https://%s.adyen.com/hpp/pay.shtml', $this->settings['mode']);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function current() {
-    return current($this->data);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function next() {
-    next($this->data);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function key() {
-    return key($this->data);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function valid() {
-    return $this->key() !== NULL;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function rewind() {
-    reset($this->data);
+    return sprintf('https://%s.adyen.com/hpp/pay.shtml', $this->paymentMethod['settings']['mode']);
   }
 
 }

@@ -13,7 +13,7 @@ use Commerce\Adyen\Payment\Transaction;
  *
  * @package Commerce\Adyen\Payment\Authorization
  */
-class Response implements SignatureInterface {
+class Response extends Signature {
 
   // @see https://docs.adyen.com/developers/hpp-manual#hpppaymentresponse
 
@@ -43,33 +43,11 @@ class Response implements SignatureInterface {
   const AUTHORIZED = 'authorised';
 
   /**
-   * Input data.
-   *
-   * @var \stdClass
-   */
-  private $data;
-  /**
    * Payment transaction.
    *
    * @var Transaction
    */
   private $transaction;
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function signatureFields() {
-    return [
-      'authResult',
-      'pspReference',
-      'merchantReference',
-      'skinCode',
-      'paymentMethod',
-      'shopperLocale',
-      'merchantReturnData',
-      'additionalData',
-    ];
-  }
 
   /**
    * Response constructor.
@@ -84,17 +62,35 @@ class Response implements SignatureInterface {
       throw new \UnexpectedValueException(t('Empty response from Adyen has been received.'));
     }
 
-    $this->data = (object) $_REQUEST;
-    $this->data->authResult = strtolower($this->data->authResult);
+    parent::__construct($order, $payment_method);
 
-    if (commerce_adyen_sha_signature($_REQUEST, $payment_method['settings']['hmac'], $this) !== $this->data->merchantSig) {
+    $this->data = $_REQUEST;
+    $this->data['authResult'] = strtolower($this->data['authResult']);
+
+    if ($this->getSignature() !== $this->data['merchantSig']) {
       throw new \UnexpectedValueException(t('Received Adyen response with invalid signature.'));
     }
 
-    $this->transaction = new Transaction($order);
+    $this->transaction = new Transaction($this->order);
     $this->transaction->setPayload($this->data);
-    $this->transaction->setRemoteId($this->data->pspReference);
-    $this->transaction->setRemoteStatus($this->data->authResult);
+    $this->transaction->setRemoteId($this->data['pspReference']);
+    $this->transaction->setRemoteStatus($this->data['authResult']);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function signatureFields() {
+    return [
+      'authResult',
+      'pspReference',
+      'merchantReference',
+      'skinCode',
+      'paymentMethod',
+      'shopperLocale',
+      'merchantReturnData',
+      'additionalData',
+    ];
   }
 
   /**
@@ -104,7 +100,7 @@ class Response implements SignatureInterface {
    *   Received data.
    */
   public function getReceivedData() {
-    return $this->data;
+    return (object) $this->data;
   }
 
   /**
@@ -114,7 +110,7 @@ class Response implements SignatureInterface {
    *   Value of one of constants of this class.
    */
   public function getAuthenticationResult() {
-    return $this->data->authResult;
+    return $this->data['authResult'];
   }
 
   /**
