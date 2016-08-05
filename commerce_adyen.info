@@ -6,7 +6,7 @@ php = 5.5
 
 configure = admin/commerce/config/payment-methods/manage/commerce_payment_commerce_adyen
 
-autoload[adyen][] = Commerce\Adyen
+autoload[adyen][] = Commerce\Adyen\Payment
 
 dependencies[] = autoload
 dependencies[] = composer_manager

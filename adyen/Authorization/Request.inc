@@ -1,38 +1,61 @@
 <?php
 /**
  * @file
- * Adyen payment request.
+ * Payment authorization request.
  */
 
-namespace Commerce\Adyen\Request;
-
-use Commerce\Adyen\SignatureInterface;
+namespace Commerce\Adyen\Payment\Authorization;
 
 /**
- * Class Payment.
+ * Class Request.
  *
- * @package Commerce\Adyen\Request
+ * @package Commerce\Adyen\Payment\Authorization
  */
-class Payment implements \Iterator, SignatureInterface {
+class Request extends Signature {
 
   /**
-   * Data for payment request.
+   * Request constructor.
    *
-   * @var string[]
+   * @param \stdClass $order
+   *   Commerce order.
+   * @param array $payment_method
+   *   Payment method information.
    */
-  private $data = [];
+  public function __construct(\stdClass $order, array $payment_method) {
+    if (empty($payment_method['settings'])) {
+      throw new \UnexpectedValueException(t('You are not configured Adyen payment gateway!'));
+    }
 
-  /**
-   * Payment constructor.
-   */
-  public function __construct() {
-    $this->data = array_fill_keys(static::signatureFields(), '');
+    parent::__construct($order, $payment_method);
+
+    $order_wrapper = entity_metadata_wrapper('commerce_order', $this->order);
+    $amount = $order_wrapper->commerce_order_total->amount->value();
+    $currency = $order_wrapper->commerce_order_total->currency_code->value();
+
+    // Adyen documentation says that the "Hungarian Forint" currency consists
+    // of 2 decimal places. But the currency doesn't support decimal places.
+    // So we need to multiply the sum by 100 for the correct data transfer.
+    if ('HUF' === $currency) {
+      $amount *= 100;
+    }
+
+    // Payment fields.
+    // @link https://docs.adyen.com/developers/hpp-manual#hpppaymentfields
+    $this->setMerchantAccount($this->paymentMethod['settings']['merchant_account']);
+    $this->setMerchantReference($this->order->order_number);
+    $this->setSkinCode($this->paymentMethod['settings']['skin_code']);
+    $this->setPaymentAmount($amount);
+    $this->setCurrencyCode($currency);
+    $this->setSessionValidity(strtotime('+ 2 hour'));
+    $this->setShopperEmail($this->order->mail);
+    $this->setShopperLocale($this->paymentMethod['settings']['shopper_locale']);
+    $this->setMerchantReturnData($this->order->data['payment_redirect_key']);
   }
 
   /**
    * {@inheritdoc}
    */
-  public static function signatureFields() {
+  protected function signatureFields() {
     return [
       'resURL',
       'skinCode',
@@ -233,69 +256,25 @@ class Payment implements \Iterator, SignatureInterface {
   }
 
   /**
-   * Set response URL.
-   *
-   * @param string $res_url
-   *   The default result landing page shoppers are redirected
-   *   to when they complete a payment on the HPP.
+   * Sign payment request.
    */
-  public function setResUrl($res_url) {
-    $this->data['resURL'] = $res_url;
+  public function signRequest() {
+    // The default result landing page shoppers are redirected to when
+    // they complete a payment on the HPP.
+    $this->data['resURL'] = url('checkout/' . $this->order->order_id . '/payment/return/' . $this->order->data['payment_redirect_key'], ['absolute' => TRUE]);
+    $this->data['merchantSig'] = $this->getSignature();
   }
 
   /**
-   * Returns response URL.
+   * Returns endpoint URL.
+   *
+   * @link https://docs.adyen.com/developers/hpp-manual#hppendpoints
    *
    * @return string
-   *   Response URL.
+   *   Endpoint URL.
    */
-  public function getResUrl() {
-    return $this->data['resURL'];
-  }
-
-  /**
-   * Sign payment request.
-   *
-   * @param string $hmac
-   *   HMAC signature from Adyen backend.
-   */
-  public function signRequest($hmac) {
-    $this->data['merchantSig'] = commerce_adyen_sha_signature($this->data, $hmac, $this);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function current() {
-    return current($this->data);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function next() {
-    next($this->data);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function key() {
-    return key($this->data);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function valid() {
-    return $this->key() !== NULL;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function rewind() {
-    reset($this->data);
+  public function getEndpoint() {
+    return sprintf('https://%s.adyen.com/hpp/pay.shtml', $this->paymentMethod['settings']['mode']);
   }
 
 }
