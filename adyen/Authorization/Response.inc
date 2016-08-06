@@ -65,11 +65,16 @@ class Response extends Signature {
     parent::__construct($order, $payment_method);
 
     $this->data = $_REQUEST;
-    $this->data['authResult'] = strtolower($this->data['authResult']);
 
+    // The "getSignature" method uses "$this->data" property for generating
+    // signature. As this is response from Adyen we should not perform any
+    // modifications of the values in this property until signature will not
+    // be generated. In simple words: we should use raw data for calculation.
     if ($this->getSignature() !== $this->data['merchantSig']) {
       throw new \UnexpectedValueException(t('Received Adyen response with invalid signature.'));
     }
+
+    $this->data['authResult'] = strtolower($this->data['authResult']);
 
     $this->transaction = new Transaction($this->order);
     $this->transaction->setPayload($this->data);
