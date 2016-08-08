@@ -38,8 +38,8 @@ function hook_commerce_adyen_payment_authorization_response_alter(\Commerce\Adye
     case $payment::ERROR:
       $transaction = $payment->getTransaction();
       $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
-      $transaction->setMessage('Payment cannot be completed. Adyen response: @response.', [
-        '@response' => $payment->getReceivedData(),
+      $transaction->setMessage('Payment cannot be completed. Adyen response: <pre>@response</pre>.', [
+        '@response' => print_r($payment->getReceivedData(), TRUE),
       ]);
       break;
   }
@@ -61,7 +61,7 @@ function hook_commerce_adyen_payment_authorization_response_alter(\Commerce\Adye
  */
 function hook_commerce_adyen_notification($event_code, \stdClass $order, \stdClass $data) {
   switch ($event_code) {
-    case \Commerce\Adyen\Payment\NotificationInterface::CANCELLATION:
+    case \Commerce\Adyen\Payment\Notification::CANCELLATION:
       $transaction = new \Commerce\Adyen\Payment\Transaction($order);
       $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
       $transaction->save();

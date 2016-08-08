@@ -211,7 +211,7 @@ class Transaction {
    *   Remote status of a transaction.
    */
   public function setRemoteStatus($remote_status) {
-    $this->transaction->remote_status = $remote_status;
+    $this->transaction->remote_status = strtolower($remote_status);
   }
 
   /**

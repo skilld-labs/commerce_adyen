@@ -20,27 +20,27 @@ class Response extends Signature {
   /**
    * An error occurred during the payment processing.
    */
-  const ERROR = 'error';
+  const ERROR = 'ERROR';
   /**
    * It is not possible to obtain the final status of the payment. This
    * can happen if the systems providing final status information for the
    * payment are unavailable, or if the shopper needs to take further action
    * to complete the payment.
    */
-  const PENDING = 'pending';
+  const PENDING = 'PENDING';
   /**
    * Payment was refused. Payment authorisation was unsuccessful.
    */
-  const REFUSED = 'refused';
+  const REFUSED = 'REFUSED';
   /**
    * Payment was cancelled by the shopper before completion, or the shopper
    * returned to the merchant's site before completing the transaction.
    */
-  const CANCELLED = 'cancelled';
+  const CANCELLED = 'CANCELLED';
   /**
    * Payment authorisation was successfully completed.
    */
-  const AUTHORIZED = 'authorised';
+  const AUTHORIZED = 'AUTHORISED';
 
   /**
    * Payment transaction.
@@ -58,13 +58,13 @@ class Response extends Signature {
    *   Payment method information.
    */
   public function __construct(\stdClass $order, array $payment_method) {
-    if (empty($_REQUEST)) {
+    $this->data = drupal_get_query_parameters();
+
+    if (empty($this->data)) {
       throw new \UnexpectedValueException(t('Empty response from Adyen has been received.'));
     }
 
     parent::__construct($order, $payment_method);
-
-    $this->data = $_REQUEST;
 
     // The "getSignature" method uses "$this->data" property for generating
     // signature. As this is response from Adyen we should not perform any
@@ -74,28 +74,10 @@ class Response extends Signature {
       throw new \UnexpectedValueException(t('Received Adyen response with invalid signature.'));
     }
 
-    $this->data['authResult'] = strtolower($this->data['authResult']);
-
     $this->transaction = new Transaction($this->order);
     $this->transaction->setPayload($this->data);
     $this->transaction->setRemoteId($this->data['pspReference']);
     $this->transaction->setRemoteStatus($this->data['authResult']);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function signatureFields() {
-    return [
-      'authResult',
-      'pspReference',
-      'merchantReference',
-      'skinCode',
-      'paymentMethod',
-      'shopperLocale',
-      'merchantReturnData',
-      'additionalData',
-    ];
   }
 
   /**

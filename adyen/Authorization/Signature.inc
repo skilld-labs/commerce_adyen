@@ -48,15 +48,12 @@ abstract class Signature implements \Iterator {
    *   Calculated SHA256 signature.
    */
   protected function getSignature() {
-    $values = [];
+    // Re-save the data to don't touch original array.
+    $data = $this->data;
+    // The "merchantSig" never must not take part in signature calculation.
+    unset($data['merchantSig']);
 
-    foreach ($this->signatureFields() as $field) {
-      if (!empty($this->data[$field])) {
-        $values[$field] = $this->data[$field];
-      }
-    }
-
-    return Util::calculateSha256Signature($this->paymentMethod['settings']['hmac'], $values);
+    return Util::calculateSha256Signature($this->paymentMethod['settings']['hmac'], $data);
   }
 
   /**
@@ -93,15 +90,5 @@ abstract class Signature implements \Iterator {
   public function rewind() {
     reset($this->data);
   }
-
-  /**
-   * Returns a list of fields for signature creation.
-   *
-   * Values must be in "$this->data" property.
-   *
-   * @return string[]
-   *   List of signature fields.
-   */
-  abstract protected function signatureFields();
 
 }

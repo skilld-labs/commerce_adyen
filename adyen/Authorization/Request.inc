@@ -6,6 +6,8 @@
 
 namespace Commerce\Adyen\Payment\Authorization;
 
+use Commerce\Adyen\Payment;
+
 /**
  * Class Request.
  *
@@ -39,27 +41,14 @@ class Request extends Signature {
     $this->setPaymentAmount(commerce_adyen_amount($order_total['amount'], $order_total['currency_code']));
     $this->setCurrencyCode($order_total['currency_code']);
     $this->setSessionValidity(strtotime('+ 2 hour'));
+    $this->setShopperIp(ip_address());
     $this->setShopperEmail($this->order->mail);
+    // The "Anonymous" value will be here in case when order will
+    // have "uid" equal to "0".
+    $this->setShopperReference($order_wrapper->owner->name->value());
     $this->setShopperLocale($this->paymentMethod['settings']['shopper_locale']);
+    $this->setShopperInteraction(Payment\ShopperInteraction::ECOMMERCE);
     $this->setMerchantReturnData($this->order->data['payment_redirect_key']);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function signatureFields() {
-    return [
-      'resURL',
-      'skinCode',
-      'currencyCode',
-      'shopperEmail',
-      'shopperLocale',
-      'paymentAmount',
-      'merchantAccount',
-      'sessionValidity',
-      'merchantReference',
-      'merchantReturnData',
-    ];
   }
 
   /**
@@ -73,7 +62,7 @@ class Request extends Signature {
   }
 
   /**
-   * Returns amount of a payment.
+   * Get amount of a payment.
    *
    * @return string
    *   Amount of a payment.
@@ -93,7 +82,7 @@ class Request extends Signature {
   }
 
   /**
-   * Returns currency code.
+   * Get currency code.
    *
    * @return string
    *   Currency code.
@@ -116,7 +105,7 @@ class Request extends Signature {
   }
 
   /**
-   * Returns merchant reference.
+   * Get merchant reference.
    *
    * @return string
    *   Merchant reference.
@@ -136,7 +125,7 @@ class Request extends Signature {
   }
 
   /**
-   * Returns skin code.
+   * Get skin code.
    *
    * @return string
    *   Skin code.
@@ -156,7 +145,7 @@ class Request extends Signature {
   }
 
   /**
-   * Returns merchant account.
+   * Get merchant account.
    *
    * @return string
    *   Merchant account.
@@ -176,7 +165,7 @@ class Request extends Signature {
   }
 
   /**
-   * Returns session validity.
+   * Get session validity.
    *
    * @return string
    *   Session validity.
@@ -196,13 +185,78 @@ class Request extends Signature {
   }
 
   /**
-   * Returns shopper email.
+   * Get shopper email.
    *
    * @return string
    *   Shopper email.
    */
   public function getShopperEmail() {
     return $this->data['shopperEmail'];
+  }
+
+  /**
+   * Set shopper reference.
+   *
+   * @param string $shopper_reference
+   *   Shopper reference.
+   *
+   * @example
+   * $payment->setShopperReference('admin');
+   */
+  public function setShopperReference($shopper_reference) {
+    $this->data['shopperReference'] = $shopper_reference;
+  }
+
+  /**
+   * Get shopper reference.
+   *
+   * @return string
+   *   Shopper reference.
+   */
+  public function getShopperReference() {
+    return $this->data['shopperReference'];
+  }
+
+  /**
+   * Set shopper IP address.
+   *
+   * @param string $shopper_ip
+   *   Shopper IP address.
+   */
+  public function setShopperIp($shopper_ip) {
+    $this->data['shopperIP'] = $shopper_ip;
+  }
+
+  /**
+   * Get shopper IP address.
+   *
+   * @return string
+   *   Shopper IP address.
+   */
+  public function getShopperIp() {
+    return $this->data['shopperIP'];
+  }
+
+  /**
+   * Set shopper interaction.
+   *
+   * @param string $shopper_interaction
+   *   Shopper interaction.
+   *
+   * @see \Commerce\Adyen\Payment\ShopperInteraction
+   */
+  public function setShopperInteraction($shopper_interaction) {
+    $this->data['shopperInteraction'] = $shopper_interaction;
+  }
+
+  /**
+   * Get shopper interaction.
+   *
+   * @return string
+   *   Shopper interaction.
+   */
+  public function getShopperInteraction() {
+    return $this->data['shopperInteraction'];
   }
 
   /**
@@ -217,7 +271,7 @@ class Request extends Signature {
   }
 
   /**
-   * Returns return data.
+   * Get return data.
    *
    * @return string
    *   Return data.
@@ -238,13 +292,47 @@ class Request extends Signature {
   }
 
   /**
-   * Returns shopper locale.
+   * Get shopper locale.
    *
    * @return string
    *   Shopper locale.
    */
   public function getShopperLocale() {
     return $this->data['shopperLocale'];
+  }
+
+  /**
+   * Set recurring contract type.
+   *
+   * @param string $recurring_contract
+   *   Recurring contract type.
+   *
+   * @see \Commerce\Adyen\Payment\RecurringContract
+   */
+  public function setRecurringContract($recurring_contract) {
+    // Shopper interaction must be set to "Ecomerce" for "ONECLICK"
+    // contract type and to "ContAuth" for "RECURRING".
+    // @see https://github.com/Adyen/php/blob/master/5.Recurring/soap/submit-recurring-payment.php
+    if (Payment\RecurringContract::ONECLICK === $recurring_contract) {
+      $this->setShopperInteraction(Payment\ShopperInteraction::ECOMMERCE);
+    }
+    else {
+      $this->setShopperInteraction(Payment\ShopperInteraction::CONTAUTH);
+    }
+
+    $this->data['recurringContract'] = $recurring_contract;
+    // @todo Do we need to add a second argument for this?
+    $this->data['selectedRecurringDetailReference'] = 'LATEST';
+  }
+
+  /**
+   * Get recurring contract type.
+   *
+   * @return string
+   *   Recurring contract type.
+   */
+  public function getRecurringContract() {
+    return $this->data['recurringContract'];
   }
 
   /**

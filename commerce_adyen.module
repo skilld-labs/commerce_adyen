@@ -41,7 +41,6 @@ function commerce_adyen_menu() {
     'type' => MENU_CALLBACK,
     'file' => 'includes/commerce_adyen.notification.inc',
     'page callback' => 'commerce_adyen_notification',
-    'delivery callback' => 'commerce_adyen_notification_deliver',
     'access callback' => TRUE,
   ];
 
@@ -132,7 +131,7 @@ function commerce_adyen_commerce_payment_transaction_update(\stdClass $transacti
  */
 function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $order, \stdClass $data) {
   switch ($event_code) {
-    case Payment\NotificationInterface::AUTHORISATION:
+    case Payment\Notification::AUTHORISATION:
       $transaction = new Payment\Transaction($order);
 
       if ($data->success) {
@@ -141,16 +140,23 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
       }
       else {
         $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
+        $transaction->setMessage($data->reason);
+
         commerce_payment_redirect_pane_previous_page($order);
       }
       break;
 
-    case Payment\NotificationInterface::CAPTURE:
+    case Payment\Notification::CAPTURE:
       $transaction = new Payment\Transaction($order);
-      $transaction->finalize();
+
+      if ($data->success) {
+        $transaction->finalize();
+      }
       break;
 
-    case Payment\NotificationInterface::CANCELLATION:
+    // @todo What should be implemented here for "CAPTURE_FAILED" notification?
+
+    case Payment\Notification::CANCELLATION:
       $transaction = new Payment\Transaction($order);
       $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
 
@@ -187,6 +193,7 @@ function commerce_adyen_capture_request(\stdClass $order) {
       $client->setEnvironment($payment_method['settings']['mode']);
 
       $capture = (new \Adyen\Service\Modification($client))->capture([
+        'reference' => $order->order_number,
         'merchantAccount' => $payment_method['settings']['merchant_account'],
         'originalReference' => $transaction->getRemoteId(),
         'modificationAmount' => [
@@ -239,17 +246,4 @@ function commerce_adyen_amount($amount, $currency) {
   }
 
   return $amount;
-}
-
-/**
- * {@inheritdoc}
- *
- * @see commerce_adyen_menu()
- * @see drupal_deliver_html_page()
- *
- * @internal
- */
-function commerce_adyen_notification_deliver($response) {
-  // Do not trigger complex logic of default delivery callback.
-  print $response;
 }
