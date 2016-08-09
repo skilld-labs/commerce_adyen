@@ -135,8 +135,11 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
       $transaction = new Payment\Transaction($order);
 
       if ($data->success) {
-        $transaction->setStatus(COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED);
-        commerce_payment_redirect_pane_next_page($order);
+        if (!$transaction->isAuthorized()) {
+          $transaction->authorise();
+
+          commerce_payment_redirect_pane_next_page($order);
+        }
       }
       else {
         $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
@@ -149,7 +152,7 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
     case Payment\Notification::CAPTURE:
       $transaction = new Payment\Transaction($order);
 
-      if ($data->success) {
+      if ($data->success && !$transaction->isFinalized()) {
         $transaction->finalize();
       }
       break;
@@ -167,61 +170,6 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
   if (isset($transaction)) {
     $transaction->save();
   }
-}
-
-/**
- * Capture request. Used as callback for action of a "rules".
- *
- * @see commerce_adyen_rules_action_info()
- *
- * @param \stdClass $order
- *   Commerce order.
- *
- * @return Payment\Transaction
- *   Payment transaction object or FALSE if there is no Adyen transaction.
- */
-function commerce_adyen_capture_request(\stdClass $order) {
-  $transaction = new Payment\Transaction($order, COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED);
-
-  if (!$transaction->isNew()) {
-    $payment_method = $transaction->getPaymentMethod();
-
-    try {
-      $client = new \Adyen\Client();
-      $client->setUsername($payment_method['settings']['client_user']);
-      $client->setPassword($payment_method['settings']['client_password']);
-      $client->setEnvironment($payment_method['settings']['mode']);
-
-      $capture = (new \Adyen\Service\Modification($client))->capture([
-        'reference' => $order->order_number,
-        'merchantAccount' => $payment_method['settings']['merchant_account'],
-        'originalReference' => $transaction->getRemoteId(),
-        'modificationAmount' => [
-          'currency' => $transaction->getCurrency(),
-          'value' => $transaction->getAmount(),
-        ],
-      ]);
-
-      if ('[capture-received]' === $capture['response']) {
-        $transaction->finalize();
-      }
-      else {
-        $transaction->setMessage('Payment has not been captured and completed with response: @response.', [
-          '@response' => $capture['response'],
-        ]);
-      }
-    }
-    catch (\Adyen\AdyenException $exception) {
-      watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $exception);
-
-      $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
-      $transaction->setMessage($exception->getMessage());
-    }
-
-    $transaction->save();
-  }
-
-  return $transaction;
 }
 
 /**

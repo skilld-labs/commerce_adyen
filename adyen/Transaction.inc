@@ -26,6 +26,12 @@ class Transaction {
    */
   private $transaction;
   /**
+   * Entity metadata wrapper for "commerce_order".
+   *
+   * @var \EntityDrupalWrapper
+   */
+  private $orderWrapper;
+  /**
    * Instance of a payment method, used for transaction.
    *
    * @var array
@@ -43,9 +49,9 @@ class Transaction {
    */
   public function __construct($order, $remote_status = '') {
     try {
-      $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+      $this->orderWrapper = entity_metadata_wrapper('commerce_order', $order);
       $conditions = [
-        'order_id' => $order_wrapper->order_id->value(),
+        'order_id' => $this->orderWrapper->order_id->value(),
         'instance_id' => COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE,
         'payment_method' => COMMERCE_ADYEN_PAYMENT_METHOD,
       ];
@@ -59,10 +65,10 @@ class Transaction {
       $this->isNew = empty($transactions);
       $this->transaction = $this->isNew ? commerce_payment_transaction_new() : reset($transactions);
       // Do not allow to change values below.
-      $this->transaction->uid = $order_wrapper->uid->value();
+      $this->transaction->uid = $this->orderWrapper->uid->value();
       $this->transaction->order_id = $conditions['order_id'];
-      $this->transaction->amount = (int) $order_wrapper->commerce_order_total->amount->value();
-      $this->transaction->currency_code = $order_wrapper->commerce_order_total->currency_code->value();
+      $this->transaction->amount = (int) $this->orderWrapper->commerce_order_total->amount->value();
+      $this->transaction->currency_code = $this->orderWrapper->commerce_order_total->currency_code->value();
     }
     catch (\Exception $e) {
       // Fallback. An order cannot be loaded. Assume that transaction is new.
@@ -90,12 +96,55 @@ class Transaction {
   }
 
   /**
+   * Returns entity metadata wrapper for "commerce_order".
+   *
+   * @return \EntityDrupalWrapper
+   *   Entity metadata wrapper for "commerce_order".
+   */
+  public function getOrder() {
+    return $this->orderWrapper;
+  }
+
+  /**
+   * Authorise a transaction.
+   */
+  public function authorise() {
+    $this->setStatus(COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED);
+    $this->setRemoteStatus(COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED);
+    $this->setMessage('Payment has been successfully authorized.');
+  }
+
+  /**
+   * Check if payment was only authorized and waiting for capturing.
+   *
+   * @return bool
+   *   A state of check.
+   */
+  public function isAuthorized() {
+    return
+      $this->getStatus() === COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED &&
+      $this->getRemoteStatus() === COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED;
+  }
+
+  /**
    * Finalize a transaction. Must be used only after successful capturing.
    */
   public function finalize() {
     $this->setStatus(COMMERCE_PAYMENT_STATUS_SUCCESS);
     $this->setRemoteStatus(COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_CAPTURED);
     $this->setMessage('Payment has been captured and completed.');
+  }
+
+  /**
+   * Check if payment has been finalized.
+   *
+   * @return bool
+   *   A state of check.
+   */
+  public function isFinalized() {
+    return
+      $this->getStatus() === COMMERCE_PAYMENT_STATUS_SUCCESS &&
+      $this->getRemoteStatus() === COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_CAPTURED;
   }
 
   /**
@@ -110,18 +159,6 @@ class Transaction {
     }
 
     return $this->paymentMethod;
-  }
-
-  /**
-   * Check if payment was only authorized and waiting for capturing.
-   *
-   * @return bool
-   *   A state of check.
-   */
-  public function isAuthorized() {
-    return
-      COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED === $this->transaction->status &&
-      COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED === $this->transaction->remote_status;
   }
 
   /**

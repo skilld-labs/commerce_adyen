@@ -40,7 +40,7 @@ class Response extends Signature {
   /**
    * Payment authorisation was successfully completed.
    */
-  const AUTHORIZED = 'AUTHORISED';
+  const AUTHORISED = 'AUTHORISED';
 
   /**
    * Payment transaction.

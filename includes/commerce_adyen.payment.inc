@@ -183,9 +183,8 @@ function commerce_adyen_redirect_form_validate(\stdClass $order, array $payment_
     $transaction = $payment->getTransaction();
 
     switch ($payment->getAuthenticationResult()) {
-      case $payment::AUTHORIZED:
-        $transaction->setStatus(COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED);
-        $transaction->setMessage('Payment has been successfully authorized.');
+      case $payment::AUTHORISED:
+        $transaction->authorise();
         break;
 
       case $payment::PENDING:

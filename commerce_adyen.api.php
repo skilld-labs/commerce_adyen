@@ -46,6 +46,55 @@ function hook_commerce_adyen_payment_authorization_response_alter(\Commerce\Adye
 }
 
 /**
+ * React on receiving capture request by Adyen.
+ *
+ * WARNING! You must not set transaction status to success here because
+ * "receiving" just means that Adyen server receive your query. It could
+ * be wrongly created - anyway Adyen will respond that capture received.
+ *
+ * WRONG USE CASE: you have multiple merchant accounts in your account in
+ * Adyen. You've made a payment with one of them and capture request - with
+ * another one. In this case you will think that payment has been captured,
+ * but it's not true.
+ *
+ * Correct use case: use notifications to finalize the payment transaction.
+ *
+ * @param \Commerce\Adyen\Payment\Transaction $transaction
+ *   Payment transaction.
+ * @param \stdClass $order
+ *   Commerce order.
+ *
+ * @see \Commerce\Adyen\Payment\Capture::request()
+ */
+function hook_commerce_adyen_capture_received(\Commerce\Adyen\Payment\Transaction $transaction, \stdClass $order) {
+  /* @var \EntityDrupalWrapper $message */
+  $message = entity_metadata_wrapper('message', message_create('commerce_adyen', [
+    'arguments' => [
+      '@message' => t('Capture request for %order_number order has been received.', [
+        '%order_number' => $order->order_number,
+      ]),
+    ],
+  ]));
+
+  $message->message_commerce_order = $order->order_id;
+  $message->save();
+}
+
+/**
+ * React on rejecting capture request by Adyen.
+ *
+ * @param \Commerce\Adyen\Payment\Transaction $transaction
+ *   Payment transaction.
+ * @param \stdClass $order
+ *   Commerce order.
+ *
+ * @see \Commerce\Adyen\Payment\Capture::request()
+ */
+function hook_commerce_adyen_capture_rejected(\Commerce\Adyen\Payment\Transaction $transaction, \stdClass $order) {
+
+}
+
+/**
  * React on a notification from Adyen.
  *
  * @link https://docs.adyen.com/developers/api-manual#notificationfields
