@@ -107,8 +107,12 @@ class Transaction {
 
   /**
    * Authorise a transaction.
+   *
+   * @param string|int $remote_id
+   *   Remote identifier of a payment transaction.
    */
-  public function authorise() {
+  public function authorise($remote_id) {
+    $this->setRemoteId($remote_id);
     $this->setStatus(COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED);
     $this->setRemoteStatus(COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED);
     $this->setMessage('Payment has been successfully authorized.');
