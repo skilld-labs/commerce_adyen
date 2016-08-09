@@ -180,41 +180,22 @@ function commerce_adyen_redirect_form_validate(\stdClass $order, array $payment_
   try {
     // GET request should be here.
     $payment = new \Commerce\Adyen\Payment\Authorization\Response($order, $payment_method);
-    $transaction = $payment->getTransaction();
 
     switch ($payment->getAuthenticationResult()) {
-      case $payment::AUTHORISED:
-        $transaction->authorise();
-        break;
-
-      case $payment::PENDING:
-        $transaction->setStatus(COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED);
-        $transaction->setMessage('Payment is pending because final status information is unavailable or shopper needs to take further actions to complete it.');
-        break;
-
       case $payment::ERROR:
       case $payment::REFUSED:
-        $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
         drupal_set_message(t('Payment authorisation was not successful. Please try again.'), 'error');
         commerce_payment_redirect_pane_previous_page($order);
         break;
 
       case $payment::CANCELLED:
-        $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
         drupal_set_message(t('Payment has been cancelled.'), 'status');
         commerce_payment_redirect_pane_previous_page($order);
         break;
-
-      default:
-        throw new \UnexpectedValueException(t('Received Adyen response with invalid "@property" property.', [
-          '@property' => 'authResult',
-        ]));
     }
 
     // @see hook_commerce_adyen_payment_authorization_response_alter()
     drupal_alter('commerce_adyen_payment_authorization_response', $payment, $order, $payment_method);
-
-    $transaction->save();
   }
   catch (\Exception $e) {
     watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
