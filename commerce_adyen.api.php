@@ -5,10 +5,10 @@
  */
 
 /**
- * Allow alter the data used to create payment authorization.
+ * Allow alter the data used to create payment authorisation.
  *
- * @param \Commerce\Adyen\Payment\Authorization\Request $payment
- *   Payment authorization request that will be sent to Adyen.
+ * @param \Commerce\Adyen\Payment\Authorisation\Request $payment
+ *   Payment authorisation request that will be sent to Adyen.
  * @param \stdClass $order
  *   Commerce order.
  * @param array $payment_method
@@ -16,16 +16,16 @@
  *
  * @see commerce_adyen_redirect_form()
  */
-function hook_commerce_adyen_payment_authorization_request_alter(\Commerce\Adyen\Payment\Authorization\Request $payment, \stdClass $order, array $payment_method) {
+function hook_commerce_adyen_payment_authorisation_request_alter(\Commerce\Adyen\Payment\Authorisation\Request $payment, \stdClass $order, array $payment_method) {
   $payment->setSessionValidity(strtotime('+ 2 hour'));
   $payment->setShopperLocale(user_load($order->uid)->language);
 }
 
 /**
- * Allow alter the data used to process payment authorization.
+ * Allow alter the data used to process payment authorisation.
  *
- * @param \Commerce\Adyen\Payment\Authorization\Response $payment
- *   Payment authorization response that has been received from Adyen.
+ * @param \Commerce\Adyen\Payment\Authorisation\Response $payment
+ *   Payment authorisation response that has been received from Adyen.
  * @param \stdClass $order
  *   Commerce order.
  * @param array $payment_method
@@ -33,7 +33,7 @@ function hook_commerce_adyen_payment_authorization_request_alter(\Commerce\Adyen
  *
  * @see commerce_adyen_redirect_form_validate()
  */
-function hook_commerce_adyen_payment_authorization_response_alter(\Commerce\Adyen\Payment\Authorization\Response $payment, \stdClass $order, array $payment_method) {
+function hook_commerce_adyen_payment_authorisation_response_alter(\Commerce\Adyen\Payment\Authorisation\Response $payment, \stdClass $order, array $payment_method) {
   switch ($payment->getAuthenticationResult()) {
     case $payment::ERROR:
       $transaction = $payment->getTransaction();

@@ -134,9 +134,9 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
   $redirect_available = TRUE;
 
   try {
-    $payment = new \Commerce\Adyen\Payment\Authorization\Request($order, $payment_method);
-    // @see hook_commerce_adyen_payment_authorization_request_alter()
-    drupal_alter('commerce_adyen_payment_authorization_request', $payment, $order, $payment_method);
+    $payment = new \Commerce\Adyen\Payment\Authorisation\Request($order, $payment_method);
+    // @see hook_commerce_adyen_payment_authorisation_request_alter()
+    drupal_alter('commerce_adyen_payment_authorisation_request', $payment, $order, $payment_method);
     // Sign the request to verify it later.
     $payment->signRequest();
 
@@ -179,7 +179,7 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
 function commerce_adyen_redirect_form_validate(\stdClass $order, array $payment_method) {
   try {
     // GET request should be here.
-    $payment = new \Commerce\Adyen\Payment\Authorization\Response($order, $payment_method);
+    $payment = new \Commerce\Adyen\Payment\Authorisation\Response($order, $payment_method);
 
     switch ($payment->getAuthenticationResult()) {
       case $payment::ERROR:
@@ -194,8 +194,8 @@ function commerce_adyen_redirect_form_validate(\stdClass $order, array $payment_
         break;
     }
 
-    // @see hook_commerce_adyen_payment_authorization_response_alter()
-    drupal_alter('commerce_adyen_payment_authorization_response', $payment, $order, $payment_method);
+    // @see hook_commerce_adyen_payment_authorisation_response_alter()
+    drupal_alter('commerce_adyen_payment_authorisation_response', $payment, $order, $payment_method);
   }
   catch (\Exception $e) {
     watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);

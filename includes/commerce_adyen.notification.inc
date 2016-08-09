@@ -36,7 +36,7 @@ function commerce_adyen_notification() {
     $order = commerce_order_load_by_number($data->merchantReference);
 
     if (FALSE === $order) {
-      throw new \RuntimeException('Authorization request made with incorrect "merchantReference" property which must be a valid order number.');
+      throw new \RuntimeException('Authorisation request made with incorrect "merchantReference" property which must be a valid order number.');
     }
 
     $watchdog();

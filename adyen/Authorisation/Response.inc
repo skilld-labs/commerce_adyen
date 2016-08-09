@@ -1,17 +1,17 @@
 <?php
 /**
  * @file
- * Payment authorization response.
+ * Payment authorisation response.
  */
 
-namespace Commerce\Adyen\Payment\Authorization;
+namespace Commerce\Adyen\Payment\Authorisation;
 
 use Commerce\Adyen\Payment\Transaction;
 
 /**
  * Class Response.
  *
- * @package Commerce\Adyen\Payment\Authorization
+ * @package Commerce\Adyen\Payment\Authorisation
  */
 class Response extends Signature {
 

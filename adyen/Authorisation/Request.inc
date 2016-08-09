@@ -1,17 +1,17 @@
 <?php
 /**
  * @file
- * Payment authorization request.
+ * Payment authorisation request.
  */
 
-namespace Commerce\Adyen\Payment\Authorization;
+namespace Commerce\Adyen\Payment\Authorisation;
 
 use Commerce\Adyen\Payment;
 
 /**
  * Class Request.
  *
- * @package Commerce\Adyen\Payment\Authorization
+ * @package Commerce\Adyen\Payment\Authorisation
  */
 class Request extends Signature {
 

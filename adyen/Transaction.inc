@@ -115,11 +115,11 @@ class Transaction {
     $this->setRemoteId($remote_id);
     $this->setStatus(COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED);
     $this->setRemoteStatus(COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED);
-    $this->setMessage('Payment has been successfully authorized.');
+    $this->setMessage('Payment has been successfully authorised.');
   }
 
   /**
-   * Check if payment was only authorized and waiting for capturing.
+   * Check if payment was only authorised and waiting for capturing.
    *
    * @return bool
    *   A state of check.

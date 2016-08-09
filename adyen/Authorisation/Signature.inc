@@ -4,14 +4,14 @@
  * Authorisation Signature.
  */
 
-namespace Commerce\Adyen\Payment\Authorization;
+namespace Commerce\Adyen\Payment\Authorisation;
 
 use Adyen\Util\Util;
 
 /**
  * Class Signature.
  *
- * @package Commerce\Adyen\Payment\Authorization
+ * @package Commerce\Adyen\Payment\Authorisation
  */
 abstract class Signature implements \Iterator {
 

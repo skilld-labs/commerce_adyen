@@ -41,7 +41,7 @@ class Capture {
    *   A state of check.
    */
   public function isAvailable() {
-    return $this->transaction->isAuthorized() && !empty($this->transaction->getRemoteId());
+    return $this->transaction->isAuthorised() && !empty($this->transaction->getRemoteId());
   }
 
   /**

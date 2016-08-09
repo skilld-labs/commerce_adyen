@@ -25,7 +25,7 @@ define('COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED', 'authorised');
  */
 define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_CAPTURED', 'captured');
 /**
- * Remote status of a payment. Payment authorized on Adyen side.
+ * Remote status of a payment. Payment authorised on Adyen side.
  */
 define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED', 'authorised');
 
@@ -75,10 +75,10 @@ function commerce_adyen_commerce_payment_transaction_status_info() {
 
   foreach ([
     // Adyen have its own payment workflow: initially payment should get
-    // the authorization confirmation and only then capturing could be
+    // the authorisation confirmation and only then capturing could be
     // done. This status must be set when Adyen responds to us.
     COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED => [
-      'title' => t('Authorized'),
+      'title' => t('Authorised'),
       'total' => TRUE,
     ],
   ] as $status => $data) {
@@ -97,7 +97,7 @@ function commerce_adyen_commerce_payment_transaction_status_info() {
  * @see commerce_payment_commerce_payment_transaction_insert()
  */
 function commerce_adyen_commerce_payment_transaction_insert(\stdClass $transaction) {
-  if ((new Payment\Transaction($transaction->order_id))->isAuthorized()) {
+  if ((new Payment\Transaction($transaction->order_id))->isAuthorised()) {
     $order = commerce_order_load($transaction->order_id);
 
     // Then check to make sure the event hasn't been invoked for this order.
