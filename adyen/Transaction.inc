@@ -124,7 +124,7 @@ class Transaction {
    * @return bool
    *   A state of check.
    */
-  public function isAuthorized() {
+  public function isAuthorised() {
     return
       $this->getStatus() === COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED &&
       $this->getRemoteStatus() === COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED;
