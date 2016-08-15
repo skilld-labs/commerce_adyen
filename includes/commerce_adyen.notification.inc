@@ -15,12 +15,12 @@ function commerce_adyen_notification() {
   $watchdog = function (\Exception $e = NULL) {
     $message = "Notification has been received. <pre>@data</pre>";
     $arguments = [
-      '@data' => print_r($_POST, TRUE),
+      '@data' => var_export($_POST, TRUE),
     ];
 
     if (NULL !== $e) {
       $message = 'Notification has' . ($e instanceof \RuntimeException ? ' ' : ' not ') . 'been received and exception been thrown: <pre>@exception</pre><pre>@data</pre>';
-      $arguments['@exception'] = print_r($e, TRUE);
+      $arguments['@exception'] = var_export($e, TRUE);
     }
 
     watchdog(COMMERCE_ADYEN_PAYMENT_METHOD, $message, $arguments);

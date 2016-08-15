@@ -76,7 +76,7 @@ class Transaction {
       $this->transaction = new \stdClass();
 
       watchdog(COMMERCE_ADYEN_PAYMENT_METHOD, 'Transaction cannot exist without the order! Input argument: <pre>@argument</pre>.', [
-        '@argument' => print_r($order, TRUE),
+        '@argument' => var_export($order, TRUE),
       ], WATCHDOG_ERROR);
     }
 

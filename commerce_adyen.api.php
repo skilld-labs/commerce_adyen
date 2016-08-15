@@ -39,7 +39,7 @@ function hook_commerce_adyen_payment_authorisation_response_alter(\Commerce\Adye
       $transaction = $payment->getTransaction();
       $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
       $transaction->setMessage('Payment cannot be completed. Adyen response: <pre>@response</pre>.', [
-        '@response' => print_r($payment->getReceivedData(), TRUE),
+        '@response' => var_export($payment->getReceivedData(), TRUE),
       ]);
       break;
   }
