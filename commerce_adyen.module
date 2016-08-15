@@ -144,6 +144,7 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
       else {
         $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
         $transaction->setMessage($data->reason);
+        $transaction->setRemoteId($data->pspReference);
 
         commerce_payment_redirect_pane_previous_page($order);
       }
