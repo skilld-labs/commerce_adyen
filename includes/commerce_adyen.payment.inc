@@ -15,54 +15,60 @@
  * @internal
  */
 function commerce_adyen_settings_form(array $settings) {
+  $inputs = [];
   $form = [];
 
+  $link = function ($title, $link) use ($settings) {
+    // @codingStandardsIgnoreStart
+    return ' ' . t('You will find the right value in the <a href="@href" target="_blank">' . $title . '</a>.', [
+      // @codingStandardsIgnoreEnd
+      '@href' => sprintf("https://ca-%s.adyen.com/ca/ca/$link", isset($settings['mode']) ? $settings['mode'] : \Adyen\Environment::TEST),
+    ]);
+  };
+
   $form['url'] = [
-    '#markup' => t('Please <a href="@notification_setup" target="_blank">configure your Adyen account</a> to send notifications to this URL: "@notification_url".', [
+    '#markup' => t('Please <a href="@notification_setup" target="_blank">configure your Adyen account</a> to send notifications to this URL: %notification_url.', [
       '@notification_setup' => 'https://docs.adyen.com/developers/api-manual#setupnotifications',
-      '@notification_url' => url(COMMERCE_ADYEN_NOTIFICATION_URL, ['absolute' => TRUE]),
+      '%notification_url' => url(COMMERCE_ADYEN_NOTIFICATION_URL, ['absolute' => TRUE]),
     ]),
   ];
 
-  $form['mode'] = [
+  $inputs['mode'] = [
     '#type' => 'radios',
     '#title' => t('Mode'),
-    '#default_value' => 'test',
+    '#default_value' => \Adyen\Environment::TEST,
     '#options' => [
       \Adyen\Environment::TEST => t('Test'),
       \Adyen\Environment::LIVE => t('Live'),
     ],
   ];
 
-  $form['merchant_account'] = [
-    '#type' => 'textfield',
+  $inputs['merchant_account'] = [
     '#title' => t('Merchant Account'),
-    '#description' => t('Do not confuse this with your Adyen account name. You find the right value in the backend in the accounts list.'),
+    '#description' => t('Do not confuse this with your Adyen account name.') . $link('account list', 'accounts/show.shtml?accountTypeCode=MerchantAccount'),
   ];
 
-  $form['client_user'] = [
-    '#type' => 'textfield',
+  $inputs['client_user'] = [
     '#title' => t('Client user'),
-    '#description' => t('User name for web service. You find the right value in "Settings -> Users" in Adyen UI.'),
+    '#description' => t('Username for a web service.') . $link('user list', 'config/users.shtml?userType=SU&status=Active'),
   ];
 
-  $form['client_password'] = [
-    '#type' => 'textfield',
+  $inputs['client_password'] = [
     '#title' => t('Client password'),
+    '#description' => t('Password for a web service user.'),
   ];
 
-  $form['skin_code'] = [
-    '#type' => 'textfield',
+  $inputs['skin_code'] = [
     '#title' => t('Skin Code'),
+    '#description' => t('A valid HPP skin code.') . $link('skin list', 'skin/skins.shtml'),
   ];
 
-  $form['hmac'] = [
-    '#type' => 'textfield',
-    '#title' => t('HMAC'),
-    '#description' => t('Please make sure you have the same HMAC value set here and in the Adyen backend.'),
+  $inputs['hmac'] = [
+    '#title' => t('HMAC key'),
+    '#description' => t('Make sure this exactly matches the HMAC in Adyen skin configuration.') . $link('skin list', 'skin/skins.shtml'),
   ];
 
-  $form['shopper_locale'] = [
+  $inputs['shopper_locale'] = [
     '#type' => 'select',
     '#title' => t('Shopper locale'),
     '#description' => t('A combination of language code and country code to specify the language used in the session.'),
@@ -100,15 +106,18 @@ function commerce_adyen_settings_form(array $settings) {
     ]),
   ];
 
-  foreach ($form as $name => $definition) {
-    $form[$name] += ['#required' => TRUE];
+  foreach ($inputs as $name => $definition) {
+    $inputs[$name] += [
+      '#type' => 'textfield',
+      '#required' => TRUE,
+    ];
 
     if (isset($settings[$name])) {
-      $form[$name]['#default_value'] = $settings[$name];
+      $inputs[$name]['#default_value'] = $settings[$name];
     }
   }
 
-  return $form;
+  return $form + $inputs;
 }
 
 /**
