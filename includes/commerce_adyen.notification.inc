@@ -39,6 +39,22 @@ function commerce_adyen_notification() {
       throw new \RuntimeException('Authorisation request made with incorrect "merchantReference" property which must be a valid order number.');
     }
 
+    // Yeah, Adyen, you are nice guy! Let's send us something similar
+    // in that spirit. We will process everything.
+    // The "success" or "live" properties will be strings with "true"
+    // or "false" values.
+    foreach ($data as $property => $value) {
+      switch (drupal_strtolower($value)) {
+        case 'true':
+          $data->$property = TRUE;
+          break;
+
+        case 'false':
+          $data->$property = FALSE;
+          break;
+      }
+    }
+
     $watchdog();
     module_invoke_all(__FUNCTION__, $data->eventCode, $order, $data);
   }
