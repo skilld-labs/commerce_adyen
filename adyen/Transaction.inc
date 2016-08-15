@@ -131,6 +131,31 @@ class Transaction {
   }
 
   /**
+   * Fail a transaction.
+   *
+   * @param string|int $remote_id
+   *   Remote identifier of a payment transaction.
+   */
+  public function fail($remote_id) {
+    $this->setRemoteId($remote_id);
+    $this->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
+    $this->setRemoteStatus(COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED);
+    $this->setMessage('Payment failed.');
+  }
+
+  /**
+   * Check if payment failed.
+   *
+   * @return bool
+   *   A state of check.
+   */
+  public function isFailed() {
+    return
+      $this->getStatus() === COMMERCE_PAYMENT_STATUS_FAILURE &&
+      $this->getRemoteStatus() === COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED;
+  }
+
+  /**
    * Finalize a transaction. Must be used only after successful capturing.
    */
   public function finalize() {
