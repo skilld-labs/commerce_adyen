@@ -151,6 +151,7 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
   }
 
   if (isset($transaction)) {
+    $transaction->setPayload($data);
     $transaction->save();
   }
 }
