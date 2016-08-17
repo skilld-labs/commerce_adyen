@@ -78,18 +78,29 @@ function commerce_adyen_commerce_payment_transaction_update(\stdClass $transacti
 }
 
 /**
- * Implements hook_commerce_order_presave().
+ * Implements hook_commerce_order_insert().
  */
-function commerce_adyen_commerce_order_presave(\stdClass $order) {
-  if (
-    // Check that "commerce_payment_order_paid_in_full" event has been already
-    // invoked.
-    !empty($order->data['commerce_payment_order_paid_in_full_invoked']) &&
-    empty($order->data['commerce_adyen_order_paid_in_full_invoked'])
-  ) {
-    rules_invoke_event('commerce_adyen_order_paid_in_full', $order);
+function commerce_adyen_commerce_order_insert(\stdClass $order) {
+  $paid_but_not_with_adyen = !empty($order->data['commerce_payment_order_paid_in_full_invoked']) && empty($order->data['commerce_adyen_order_paid_in_full_invoked']);
+
+  // Check that the order has been paid in full, but not mark as paid by this
+  // module yet.
+  if ($paid_but_not_with_adyen) {
+    // Add our own paid in full flag. Note we're doing this before invoking the
+    // rule, this is to allow other modules/rules to rely on this flag during
+    // the rule invocation.
     $order->data['commerce_adyen_order_paid_in_full_invoked'] = TRUE;
+    commerce_order_save($order);
+
+    rules_invoke_event('commerce_adyen_order_paid_in_full', $order);
   }
+}
+
+/**
+ * Implements hook_commerce_order_update().
+ */
+function commerce_adyen_commerce_order_update(\stdClass $order) {
+  commerce_adyen_commerce_order_insert($order);
 }
 
 /**
