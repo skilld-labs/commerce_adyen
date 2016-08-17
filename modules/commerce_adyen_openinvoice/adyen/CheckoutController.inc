@@ -108,4 +108,5 @@ class CheckoutController extends Checkout {
 
     return TRUE;
   }
+
 }
