@@ -98,24 +98,16 @@ function commerce_adyen_commerce_payment_transaction_status_info() {
  */
 function commerce_adyen_commerce_payment_transaction_insert(\stdClass $transaction) {
   if ((new Payment\Transaction($transaction->order_id))->isAuthorised()) {
-    $order = commerce_order_load($transaction->order_id);
+    // An authorised payment with Adyen needs to be treated as part of the order
+    // total. So we need to check the balance and fire the paid in full event.
+    // Invoke the commerce_payment hook, with a spoofed success status,
+    // instead of duplicating code.
+    $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
 
-    // Then check to make sure the event hasn't been invoked for this order.
-    if (empty($order->data['commerce_payment_order_paid_in_full_invoked'])) {
-      // Check the order balance and invoke the event.
-      $balance = commerce_payment_order_balance($order);
+    module_invoke('commerce_payment', 'commerce_payment_transaction_insert', $transaction);
 
-      if (!empty($balance) && $balance['amount'] <= 0) {
-        // Invoke the event including a hook of the same name.
-        rules_invoke_all('commerce_payment_order_paid_in_full', $order, $transaction);
-
-        // Update the order's data array to indicate this just happened.
-        $order->data['commerce_payment_order_paid_in_full_invoked'] = TRUE;
-
-        // Save the updated order.
-        commerce_order_save($order);
-      }
-    }
+    // Restore our custom transaction status.
+    $transaction->status = COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED;
   }
 }
 
@@ -154,11 +146,13 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
       }
       break;
 
-    // @todo What should be implemented here for "CAPTURE_FAILED" notification?
+    case Payment\Notification::CAPTURE_FAILED:
+      // @todo What should be implemented here?
+      break;
 
     case Payment\Notification::CANCELLATION:
       $transaction = new Payment\Transaction($order);
-      $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
+      $transaction->fail($data->pspReference);
 
       commerce_order_status_update($order, 'canceled');
       break;
@@ -171,7 +165,66 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
 }
 
 /**
+ * Get payment type definitions.
+ *
+ * @return array[]
+ *   Payment type definitions.
+ *
+ * @see hook_commerce_adyen_payment_types()
+ */
+function commerce_adyen_payment_types() {
+  $payment_types = [];
+
+  $add_payment_type = function ($name, array $payment_type) use (&$payment_types) {
+    try {
+      if (!isset($payment_type['label'])) {
+        throw new \InvalidArgumentException(t('Adyen payment type definition must have a label.'));
+      }
+
+      if (!isset($payment_type['controllers']['payment'])) {
+        throw new \InvalidArgumentException(t('Adyen payment type must have definition of payment controller.'));
+      }
+
+      if (!is_subclass_of($payment_type['controllers']['payment'], Payment\Controller\Payment::class)) {
+        throw new \InvalidArgumentException(t('Adyen payment type controller must be inherited from %class.', [
+          '%class' => Payment\Controller\Payment::class,
+        ]));
+      }
+
+      if (isset($payment_type['controllers']['checkout']) && !is_subclass_of($payment_type['controllers']['checkout'], Payment\Controller\Checkout::class)) {
+        throw new \InvalidArgumentException(t('Adyen payment checkout controller must be inherited from %class.', [
+          '%class' => Payment\Controller\Checkout::class,
+        ]));
+      }
+
+      $payment_types[$name] = $payment_type;
+    }
+    catch (\InvalidArgumentException $e) {
+      watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
+    }
+  };
+
+  // Collect payment types.
+  foreach (module_invoke_all(__FUNCTION__) as $name => $data) {
+    $add_payment_type($name, $data);
+  }
+
+  // Allow other modules to alter the implementations.
+  drupal_alter(__FUNCTION__, $payment_types);
+
+  // Validate payment types after alteration.
+  foreach ($payment_types as $name => $data) {
+    $add_payment_type($name, $data);
+  }
+
+  return $payment_types;
+}
+
+/**
  * Process an amount due to strange behavior regarding some currencies.
+ *
+ * This function must be called for every price amount and all logic
+ * for processing currencies must be here.
  *
  * @param int $amount
  *   Payment amount.

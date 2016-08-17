@@ -1,0 +1,22 @@
+<?php
+/**
+ * @file
+ * Adyen OpenInvoice payments.
+ */
+
+/**
+ * Implements hook_commerce_adyen_payment_types().
+ */
+function commerce_adyen_openinvoice_commerce_adyen_payment_types() {
+  $types = [];
+
+  $types['openinvoice'] = [
+    'label' => 'OpenInvoice',
+    'controllers' => [
+      'payment' => \Commerce\Adyen\Payment\OpenInvoice\PaymentController::class,
+      'checkout' => \Commerce\Adyen\Payment\OpenInvoice\CheckoutController::class,
+    ],
+  ];
+
+  return $types;
+}

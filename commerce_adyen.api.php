@@ -119,3 +119,39 @@ function hook_commerce_adyen_notification($event_code, \stdClass $order, \stdCla
       break;
   }
 }
+
+/**
+ * Provide additional data for Adyen by implementing payment types.
+ *
+ * @return array[]
+ *   An associative array where key - is an unique name of payment type
+ *   and value - is an associative array with two mandatory keys: "label"
+ *   and "class".
+ *
+ * @see commerce_adyen_payment_types()
+ */
+function hook_commerce_adyen_payment_types() {
+  $types = [];
+
+  $types['openinvoice'] = [
+    'label' => 'OpenInvoice',
+    'controllers' => [
+      'payment' => \Commerce\Adyen\Payment\OpenInvoice\PaymentController::class,
+      'checkout' => \Commerce\Adyen\Payment\OpenInvoice\CheckoutController::class,
+    ],
+  ];
+
+  return $types;
+}
+
+/**
+ * Allow to alter existing definitions of payment types.
+ *
+ * @param array[] $payment_types
+ *   An associative array with defined payment types.
+ *
+ * @see hook_commerce_adyen_payment_types()
+ */
+function hook_commerce_adyen_payment_types_alter(array &$payment_types) {
+  unset($payment_types['openinvoice']);
+}

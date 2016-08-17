@@ -6,6 +6,8 @@
 
 namespace Commerce\Adyen\Payment\Authorisation;
 
+use Adyen\Contract;
+use Adyen\Service\Recurring;
 use Commerce\Adyen\Payment;
 
 /**
@@ -14,6 +16,15 @@ use Commerce\Adyen\Payment;
  * @package Commerce\Adyen\Payment\Authorisation
  */
 class Request extends Signature {
+
+  use Payment\Client;
+
+  /**
+   * Entity wrapper for "commerce_order".
+   *
+   * @var \EntityDrupalWrapper
+   */
+  protected $orderWrapper;
 
   /**
    * Request constructor.
@@ -30,22 +41,22 @@ class Request extends Signature {
 
     parent::__construct($order, $payment_method);
 
-    $order_wrapper = entity_metadata_wrapper('commerce_order', $this->order);
-    $order_total = $order_wrapper->commerce_order_total->value();
+    $this->orderWrapper = entity_metadata_wrapper('commerce_order', $this->order);
 
     // Payment fields.
     // @link https://docs.adyen.com/developers/hpp-manual#hpppaymentfields
     $this->setMerchantAccount($this->paymentMethod['settings']['merchant_account']);
     $this->setMerchantReference($this->order->order_number);
     $this->setSkinCode($this->paymentMethod['settings']['skin_code']);
-    $this->setPaymentAmount(commerce_adyen_amount($order_total['amount'], $order_total['currency_code']));
-    $this->setCurrencyCode($order_total['currency_code']);
+    // Currency code must be set before amount!
+    $this->setCurrencyCode($this->orderWrapper->commerce_order_total->currency_code->value());
+    $this->setPaymentAmount($this->orderWrapper->commerce_order_total->amount->value());
     $this->setSessionValidity(strtotime('+ 2 hour'));
     $this->setShopperIp(ip_address());
     $this->setShopperEmail($this->order->mail);
     // The "Anonymous" value will be here in case when order will
     // have "uid" equal to "0".
-    $this->setShopperReference($order_wrapper->owner->name->value());
+    $this->setShopperReference($this->orderWrapper->owner->name->value());
     $this->setShopperLocale($this->paymentMethod['settings']['shopper_locale']);
     $this->setShopperInteraction(Payment\ShopperInteraction::ECOMMERCE);
     $this->setMerchantReturnData($this->order->data['payment_redirect_key']);
@@ -56,9 +67,15 @@ class Request extends Signature {
    *
    * @param int $payment_amount
    *   Payment amount. Specified in minor units.
+   *
+   * @throws \InvalidArgumentException
    */
   public function setPaymentAmount($payment_amount) {
-    $this->data['paymentAmount'] = $payment_amount;
+    if (empty($this->data['currencyCode'])) {
+      throw new \InvalidArgumentException(t('You must set currency code before setting the price!'));
+    }
+
+    $this->data['paymentAmount'] = commerce_adyen_amount($payment_amount, $this->data['currencyCode']);
   }
 
   /**
@@ -161,6 +178,9 @@ class Request extends Signature {
    *   The final time by which a payment needs to have been made.
    */
   public function setSessionValidity($session_validity) {
+    // No need to take care about the timezone because Drupal do this by itself.
+    // @see drupal_session_regenerate()
+    // @see drupal_session_initialize()
     $this->data['sessionValidity'] = date(DATE_ATOM, $session_validity);
   }
 
@@ -305,24 +325,22 @@ class Request extends Signature {
    * Set recurring contract type.
    *
    * @param string $recurring_contract
-   *   Recurring contract type.
+   *   Recurring contract type. Use one constants only.
+   * @param string $payment_reference
+   *   PSP reference of a payment or "LATEST" to use latest one.
    *
-   * @see \Commerce\Adyen\Payment\RecurringContract
+   * @see \Adyen\Contract
    */
-  public function setRecurringContract($recurring_contract) {
+  public function setRecurringContract($recurring_contract, $payment_reference = 'LATEST') {
     // Shopper interaction must be set to "Ecomerce" for "ONECLICK"
     // contract type and to "ContAuth" for "RECURRING".
     // @see https://github.com/Adyen/php/blob/master/5.Recurring/soap/submit-recurring-payment.php
-    if (Payment\RecurringContract::ONECLICK === $recurring_contract) {
-      $this->setShopperInteraction(Payment\ShopperInteraction::ECOMMERCE);
-    }
-    else {
+    if (Contract::RECURRING === $recurring_contract) {
       $this->setShopperInteraction(Payment\ShopperInteraction::CONTAUTH);
     }
 
     $this->data['recurringContract'] = $recurring_contract;
-    // @todo Do we need to add a second argument for this?
-    $this->data['selectedRecurringDetailReference'] = 'LATEST';
+    $this->data['selectedRecurringDetailReference'] = $payment_reference;
   }
 
   /**
@@ -333,6 +351,35 @@ class Request extends Signature {
    */
   public function getRecurringContract() {
     return $this->data['recurringContract'];
+  }
+
+  /**
+   * Get recurring contract details.
+   *
+   * @return array
+   *   An array of data with recurring details.
+   */
+  public function getRecurringContractDetails() {
+    $recurring = new Recurring($this->getClient($this->paymentMethod));
+
+    return $recurring->listRecurringDetails([
+      'merchantAccount' => $this->paymentMethod['settings']['merchant_account'],
+      'shopperReference' => $this->getShopperReference(),
+      'recurring' => [
+        'contract' => $this->getRecurringContract(),
+      ],
+    ]);
+  }
+
+  /**
+   * Extend payment authorisation request.
+   *
+   * @param Payment\Controller\Payment $payment
+   *   Object with additional payment data.
+   */
+  public function extend(Payment\Controller\Payment $payment) {
+    $payment->setOrder($this->orderWrapper);
+    $this->data = array_merge($this->data, $payment->getData());
   }
 
   /**

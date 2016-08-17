@@ -6,7 +6,6 @@
 
 namespace Commerce\Adyen\Payment;
 
-use Adyen\Client;
 use Adyen\Service;
 use Adyen\AdyenException;
 
@@ -16,6 +15,8 @@ use Adyen\AdyenException;
  * @package Commerce\Adyen\Payment
  */
 class Capture {
+
+  use Client;
 
   /**
    * Payment transaction.
@@ -52,22 +53,18 @@ class Capture {
    */
   public function request() {
     $payment_method = $this->transaction->getPaymentMethod();
+    $currency_code = $this->transaction->getCurrency();
     $order = $this->transaction->getOrder()->value();
-
-    $client = new Client();
-    $client->setUsername($payment_method['settings']['client_user']);
-    $client->setPassword($payment_method['settings']['client_password']);
-    $client->setEnvironment($payment_method['settings']['mode']);
 
     // Make an API call to tell Adyen that we are waiting for notification
     // from it.
-    $capture = (new Service\Modification($client))->capture([
+    $capture = (new Service\Modification($this->getClient($payment_method)))->capture([
       'reference' => $order->order_number,
       'merchantAccount' => $payment_method['settings']['merchant_account'],
       'originalReference' => $this->transaction->getRemoteId(),
       'modificationAmount' => [
-        'currency' => $this->transaction->getCurrency(),
-        'value' => $this->transaction->getAmount(),
+        'currency' => $currency_code,
+        'value' => commerce_adyen_amount($this->transaction->getAmount(), $currency_code),
       ],
     ]);
 

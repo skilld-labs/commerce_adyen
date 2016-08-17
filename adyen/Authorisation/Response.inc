@@ -76,8 +76,13 @@ class Response extends Signature {
 
     $this->transaction = new Transaction($this->order);
     $this->transaction->setPayload($this->data);
-    $this->transaction->setRemoteId($this->data['pspReference']);
     $this->transaction->setRemoteStatus($this->data['authResult']);
+
+    // The "pspReference" property will not exist in cases like
+    // payment cancellation or similar.
+    if (isset($this->data['pspReference'])) {
+      $this->transaction->setRemoteId($this->data['pspReference']);
+    }
   }
 
   /**
