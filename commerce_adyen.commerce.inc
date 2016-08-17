@@ -88,6 +88,10 @@ function commerce_adyen_commerce_payment_transaction_update(\stdClass $transacti
 
 /**
  * Implements hook_commerce_order_insert().
+ *
+ * @todo We need to deeply debug the "commerce_payment_order_paid_in_full" rule
+ * and, possibly, get rid from this hook and "commerce_adyen_order_paid_in_full"
+ * event.
  */
 function commerce_adyen_commerce_order_insert(\stdClass $order) {
   $paid_but_not_with_adyen = !empty($order->data['commerce_payment_order_paid_in_full_invoked']) && empty($order->data['commerce_adyen_order_paid_in_full_invoked']);
