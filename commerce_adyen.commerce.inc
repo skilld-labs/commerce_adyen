@@ -56,11 +56,12 @@ function commerce_adyen_commerce_payment_transaction_status_info() {
  * @see commerce_payment_commerce_payment_transaction_insert()
  */
 function commerce_adyen_commerce_payment_transaction_insert(\stdClass $transaction) {
-  // Load the order.
-  $order = commerce_order_load($transaction->order_id);
+  $adyen_transaction = new Payment\Transaction($transaction->order_id);
 
   // Check the transaction is authorised.
-  if ((new Payment\Transaction($transaction->order_id))->isAuthorised()) {
+  if ($adyen_transaction->isAuthorised()) {
+    $order = $adyen_transaction->getOrder()->value();
+
     // Then check to make sure the event hasn't been invoked for this order.
     if (empty($order->data['commerce_payment_order_paid_in_full_invoked'])) {
       // Check the order balance and invoke the event.
@@ -69,10 +70,8 @@ function commerce_adyen_commerce_payment_transaction_insert(\stdClass $transacti
       if (!empty($balance) && $balance['amount'] <= 0) {
         // Invoke the event including a hook of the same name.
         rules_invoke_all('commerce_payment_order_paid_in_full', $order, $transaction);
-
         // Update the order's data array to indicate this just happened.
         $order->data['commerce_payment_order_paid_in_full_invoked'] = TRUE;
-
         // Save the updated order.
         commerce_order_save($order);
       }
