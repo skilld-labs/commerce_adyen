@@ -22,20 +22,39 @@ class CheckoutController extends Checkout {
     $fields = [];
 
     $fields['gender'] = [
+      'type' => 'list_text',
       'label' => t('Gender'),
+      'widget' => [
+        'type' => 'options_buttons',
+      ],
+      'settings' => [
+        'allowed_values' => [
+          'MALE' => t('Male'),
+          'FEMALE' => t('Female'),
+        ],
+      ],
     ];
 
     $fields['phone_number'] = [
+      'type' => 'text',
       'label' => t('Phone number'),
     ];
 
     $fields['birth_date'] = [
+      'type' => 'datestamp',
       'label' => t('Date of birth'),
+      'settings' => [
+        'year_range' => '-100:-5',
+        'granularity' => drupal_map_assoc(['year', 'month', 'day']),
+      ],
+      'widget' => [
+        'input_format' => 'd/m/Y',
+      ],
     ];
 
     foreach ($fields as $name => $info) {
       $fields[$name] += [
-        'type' => 'text',
+        'required' => TRUE,
         'cardinality' => 1,
         'translatable' => FALSE,
       ];
@@ -48,33 +67,35 @@ class CheckoutController extends Checkout {
    * {@inheritdoc}
    */
   public function checkoutForm(\EntityDrupalWrapper $billing) {
+    $fields = $this->checkoutFields();
     $form = [];
 
     $form['gender'] = [
       '#type' => 'radios',
       '#title' => t('Gender'),
-      '#required' => TRUE,
-      '#default_value' => $billing->commerce_adyen_gender->value(),
-      '#options' => [
-        'MALE' => t('Male'),
-        'FEMALE' => t('Female'),
-      ],
+      '#options' => $fields['gender']['settings']['allowed_values'],
     ];
 
     $form['phone_number'] = [
       '#type' => 'textfield',
       '#title' => t('Phone'),
-      '#required' => TRUE,
-      '#default_value' => $billing->commerce_adyen_phone_number->value(),
     ];
 
     $form['birth_date'] = [
-      '#type' => 'date_popup',
+      '#type' => 'date_select',
       '#title' => t('Date of birth'),
-      '#required' => TRUE,
-      '#date_format' => $this->config['date_format'],
-      '#default_value' => $billing->commerce_adyen_birth_date->value(),
+      '#date_format' => $fields['birth_date']['widget']['input_format'],
+      '#date_year_range' => $fields['birth_date']['settings']['year_range'],
     ];
+
+    foreach ($form as $item => $definition) {
+      $field_name = COMMERCE_ADYEN_PAYMENT_METHOD . '_' . $item;
+
+      $form[$item] += [
+        '#required' => !empty($fields[$item]['required']),
+        '#default_value' => isset($billing->{$field_name}) ? $billing->{$field_name}->value() : NULL,
+      ];
+    }
 
     return $form;
   }

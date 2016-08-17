@@ -25,16 +25,7 @@ class PaymentController extends Payment {
    * {@inheritdoc}
    */
   public function configForm() {
-    $date_formats = [];
     $form = [];
-
-    foreach (system_get_date_formats() as $type => $formats) {
-      $date_formats[$type] = [];
-
-      foreach ($formats as $format => $info) {
-        $date_formats[$type][$format] = format_date(REQUEST_TIME, 'custom', $format);
-      }
-    }
 
     $form['type'] = [
       '#type' => 'select',
@@ -55,14 +46,6 @@ class PaymentController extends Payment {
         t('Fields are visible but unmodifiable'),
         t('Fields are not visible and unmodifiable'),
       ],
-    ];
-
-    $form['date_format'] = [
-      '#type' => 'select',
-      '#title' => t('Date format'),
-      '#options' => $date_formats,
-      '#description' => t('OpenInvoice payments require customers date of birth and this setting allow you to choose in which format they are will select it.'),
-      '#default_value' => 'm/d/Y',
     ];
 
     return $form;
