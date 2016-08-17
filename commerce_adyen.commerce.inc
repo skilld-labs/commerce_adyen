@@ -56,17 +56,27 @@ function commerce_adyen_commerce_payment_transaction_status_info() {
  * @see commerce_payment_commerce_payment_transaction_insert()
  */
 function commerce_adyen_commerce_payment_transaction_insert(\stdClass $transaction) {
+  // Load the order.
+  $order = commerce_order_load($transaction->order_id);
+
+  // Check the transaction is authorised.
   if ((new Payment\Transaction($transaction->order_id))->isAuthorised()) {
-    // An authorised payment with Adyen needs to be treated as part of the order
-    // total. So we need to check the balance and fire the paid in full event.
-    // Invoke the commerce_payment hook, with a spoofed success status,
-    // instead of duplicating code.
-    $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+    // Then check to make sure the event hasn't been invoked for this order.
+    if (empty($order->data['commerce_payment_order_paid_in_full_invoked'])) {
+      // Check the order balance and invoke the event.
+      $balance = commerce_payment_order_balance($order);
 
-    module_invoke('commerce_payment', 'commerce_payment_transaction_insert', $transaction);
+      if (!empty($balance) && $balance['amount'] <= 0) {
+        // Invoke the event including a hook of the same name.
+        rules_invoke_all('commerce_payment_order_paid_in_full', $order, $transaction);
 
-    // Restore our custom transaction status.
-    $transaction->status = COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED;
+        // Update the order's data array to indicate this just happened.
+        $order->data['commerce_payment_order_paid_in_full_invoked'] = TRUE;
+
+        // Save the updated order.
+        commerce_order_save($order);
+      }
+    }
   }
 }
 
