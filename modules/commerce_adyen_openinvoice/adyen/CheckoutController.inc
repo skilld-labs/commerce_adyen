@@ -100,4 +100,12 @@ class CheckoutController extends Checkout {
     return $form;
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function checkoutFormValidate(array $form, array &$values, \EntityDrupalWrapper $billing) {
+    $values['birth_date'] = strtotime($values['birth_date']);
+
+    return TRUE;
+  }
 }
