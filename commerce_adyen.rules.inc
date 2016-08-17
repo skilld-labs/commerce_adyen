@@ -45,6 +45,24 @@ function commerce_adyen_rules_event_info() {
 }
 
 /**
+ * Implements hook_rules_event_info().
+ */
+function commerce_adyen_rules_event_info() {
+  $events = [];
+
+  $events['commerce_adyen_order_paid_in_full'] = [
+    'label' => t('Adyen transaction is authorised'),
+    'group' => t('Commerce Payment'),
+    'access callback' => 'commerce_order_rules_access',
+    'variables' => [
+      entity_rules_events_variables('commerce_order', t('Order'), TRUE),
+    ],
+  ];
+
+  return $events;
+}
+
+/**
  * Capture request.
  *
  * @see commerce_adyen_rules_action_info()

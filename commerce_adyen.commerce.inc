@@ -114,6 +114,20 @@ function commerce_adyen_commerce_order_update(\stdClass $order) {
 }
 
 /**
+ * Implements hook_commerce_order_presave().
+ */
+function commerce_adyen_commerce_order_presave(\stdClass $order) {
+  if (
+    // The "commerce_payment_order_paid_in_full" event has been already invoked.
+    !empty($order->data['commerce_payment_order_paid_in_full_invoked']) &&
+    empty($order->data['commerce_adyen_order_paid_in_full_invoked'])
+  ) {
+    rules_invoke_event('commerce_adyen_order_paid_in_full', $order);
+    $order->data['commerce_adyen_order_paid_in_full_invoked'] = TRUE;
+  }
+}
+
+/**
  * Implements hook_commerce_adyen_notification().
  */
 function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $order, \stdClass $data) {
