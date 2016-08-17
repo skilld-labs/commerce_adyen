@@ -20,6 +20,20 @@ class Request extends Signature {
   use Payment\Client;
 
   /**
+   * Default endpoint to send the request.
+   */
+  const ENDPOINT_PAY = 'pay';
+  /**
+   * Sent the request there to select the payment method.
+   */
+  const ENDPOINT_SELECT = 'select';
+  /**
+   * Send the request there together with "brandCode"
+   * parameter to skip payment method selection.
+   */
+  const ENDPOINT_SKIP_DETAILS = 'skipDetails';
+
+  /**
    * Entity wrapper for "commerce_order".
    *
    * @var \EntityDrupalWrapper
@@ -397,11 +411,14 @@ class Request extends Signature {
    *
    * @link https://docs.adyen.com/developers/hpp-manual#hppendpoints
    *
+   * @param string $endpoint
+   *   An endpoint to send the request.
+   *
    * @return string
    *   Endpoint URL.
    */
-  public function getEndpoint() {
-    return sprintf('https://%s.adyen.com/hpp/pay.shtml', $this->paymentMethod['settings']['mode']);
+  public function getEndpoint($endpoint = self::ENDPOINT_PAY) {
+    return sprintf('https://%s.adyen.com/hpp/%s.shtml', $this->paymentMethod['settings']['mode'], $endpoint);
   }
 
 }
