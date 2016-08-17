@@ -285,7 +285,7 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
       $payment->setRecurringContract($payment_method['settings']['recurring']);
     }
 
-    if (FALSE !== $payment_type) {
+    if (NULL !== $payment_type) {
       $payment->extend($payment_type);
     }
 
