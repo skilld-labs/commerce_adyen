@@ -155,3 +155,42 @@ function hook_commerce_adyen_payment_types() {
 function hook_commerce_adyen_payment_types_alter(array &$payment_types) {
   unset($payment_types['openinvoice']);
 }
+
+/**
+ * React on initialization of checkout fields.
+ *
+ * @param array[] $instances
+ *   Drupal field definitions.
+ * @param \EntityDrupalWrapper $order
+ *   Wrapper for the "commerce_order" entity.
+ * @param \Commerce\Adyen\Payment\Controller\Checkout $controller
+ *   An instance of checkout controller.
+ * @param string $type
+ *   Machine name of payment type.
+ *
+ * @see commerce_adyen_submit_form()
+ */
+function hook_commerce_adyen_checkout_fields_init(array $instances, \EntityDrupalWrapper $order, \Commerce\Adyen\Payment\Controller\Checkout $controller, $type) {
+
+}
+
+/**
+ * React on saving the values of checkout fields.
+ *
+ * This hook will be triggered only if validation of the controller
+ * will be succeed.
+ *
+ * @param array $values
+ *   Values of checkout form.
+ * @param \EntityDrupalWrapper $order
+ *   Wrapper for the "commerce_order" entity.
+ * @param \Commerce\Adyen\Payment\Controller\Checkout $controller
+ *   An instance of checkout controller.
+ * @param string $type
+ *   Machine name of payment type.
+ *
+ * @see commerce_adyen_submit_form_submit()
+ */
+function hook_commerce_adyen_checkout_fields_save(array $values, \EntityDrupalWrapper $order, \Commerce\Adyen\Payment\Controller\Checkout $controller, $type) {
+
+}
