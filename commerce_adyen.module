@@ -161,3 +161,36 @@ function commerce_adyen_amount($amount, $currency) {
 
   return $amount;
 }
+
+/**
+ * Instantiate payment controller.
+ *
+ * @param string $controller
+ *   One of controller types: "payment" or "checkout".
+ * @param array $settings
+ *   Payment method settings.
+ * @param array[] $payment_types
+ *   List of payment types. Must be result of "commerce_adyen_payment_types()".
+ *
+ * @return Payment\Controller\Payment|Payment\Controller\Checkout|NULL
+ *   NULL is payment type class cannot be instantiated.
+ */
+function commerce_adyen_invoke_controller($controller, array $settings = NULL, array $payment_types = NULL) {
+  if (NULL === $settings) {
+    $settings = commerce_payment_method_instance_load(COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE)['settings'];
+  }
+
+  if (empty($settings['type'])) {
+    return NULL;
+  }
+
+  if (NULL === $payment_types) {
+    $payment_types = commerce_adyen_payment_types();
+  }
+
+  if (!isset($payment_types[$settings['type']]['controllers'][$controller])) {
+    return NULL;
+  }
+
+  return new $payment_types[$settings['type']]['controllers'][$controller](isset($settings[$settings['type']]) ? $settings[$settings['type']] : []);
+}
