@@ -39,6 +39,12 @@ class Request extends Signature {
    * @var \EntityDrupalWrapper
    */
   protected $orderWrapper;
+  /**
+   * Request endpoint.
+   *
+   * @var string
+   */
+  protected $endpoint = '';
 
   /**
    * Request constructor.
@@ -74,6 +80,7 @@ class Request extends Signature {
     $this->setShopperLocale($this->paymentMethod['settings']['shopper_locale']);
     $this->setShopperInteraction(Payment\ShopperInteraction::ECOMMERCE);
     $this->setMerchantReturnData($this->order->data['payment_redirect_key']);
+    $this->setEndpoint(self::ENDPOINT_PAY);
   }
 
   /**
@@ -110,6 +117,26 @@ class Request extends Signature {
    */
   public function setCurrencyCode($currency_code) {
     $this->data['currencyCode'] = $currency_code;
+  }
+
+  /**
+   * Get brand code of a payment.
+   *
+   * @return string
+   *   Brand code of a payment.
+   */
+  public function getBrandCode() {
+    return $this->data['brandCode'];
+  }
+
+  /**
+   * Set brand code.
+   *
+   * @param string $brand_code
+   *   Brand code.
+   */
+  public function setBrandCode($brand_code) {
+    $this->data['brandCode'] = $brand_code;
   }
 
   /**
@@ -411,14 +438,26 @@ class Request extends Signature {
    *
    * @link https://docs.adyen.com/developers/hpp-manual#hppendpoints
    *
-   * @param string $endpoint
-   *   An endpoint to send the request.
-   *
    * @return string
    *   Endpoint URL.
    */
-  public function getEndpoint($endpoint = self::ENDPOINT_PAY) {
-    return sprintf('https://%s.adyen.com/hpp/%s.shtml', $this->paymentMethod['settings']['mode'], $endpoint);
+  public function getEndpoint() {
+    return sprintf('https://%s.adyen.com/hpp/%s.shtml', $this->paymentMethod['settings']['mode'], $this->endpoint);
+  }
+
+  /**
+   * Set endpoint type.
+   *
+   * @param string $endpoint
+   *   An endpoint type to send the request.
+   *
+   * @throws \InvalidArgumentException
+   */
+  public function setEndpoint($endpoint) {
+    if (!in_array($endpoint, [static::ENDPOINT_PAY, static::ENDPOINT_SELECT, static::ENDPOINT_SKIP_DETAILS])) {
+      throw new \InvalidArgumentException(t('Endpoint for payment request is incorrect!'));
+    }
+    $this->endpoint = $endpoint;
   }
 
 }
