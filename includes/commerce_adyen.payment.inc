@@ -286,7 +286,6 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
     }
 
     if (NULL !== $payment_type) {
-      $payment_type->setPayment($payment);
       $payment->extend($payment_type);
     }
 

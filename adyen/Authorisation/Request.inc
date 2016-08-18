@@ -443,6 +443,8 @@ class Request extends Signature {
    */
   public function extend(Payment\Controller\Payment $payment) {
     $payment->setOrder($this->orderWrapper);
+    $payment->setPayment($this);
+
     $this->data = array_merge($this->data, $payment->getData());
   }
 
@@ -473,13 +475,12 @@ class Request extends Signature {
    *
    * @param string $endpoint
    *   An endpoint type to send the request.
-   *
-   * @throws \InvalidArgumentException
    */
   public function setEndpoint($endpoint) {
     if (!in_array($endpoint, [static::ENDPOINT_PAY, static::ENDPOINT_SELECT, static::ENDPOINT_SKIP_DETAILS])) {
       throw new \InvalidArgumentException(t('Endpoint for payment request is incorrect!'));
     }
+
     $this->endpoint = $endpoint;
   }
 
