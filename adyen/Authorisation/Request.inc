@@ -78,6 +78,7 @@ class Request extends Signature {
     // have "uid" equal to "0".
     $this->setShopperReference($this->orderWrapper->owner->name->value());
     $this->setShopperLocale($this->paymentMethod['settings']['shopper_locale']);
+    $this->setCountryCode($this->orderWrapper->commerce_customer_billing->commerce_customer_address->country->value());
     $this->setShopperInteraction(Payment\ShopperInteraction::ECOMMERCE);
     $this->setMerchantReturnData($this->order->data['payment_redirect_key']);
     $this->setEndpoint(self::ENDPOINT_PAY);
@@ -339,6 +340,28 @@ class Request extends Signature {
    */
   public function getMerchantReturnData() {
     return $this->data['merchantReturnData'];
+  }
+
+  /**
+   * Set country code.
+   *
+   * @param string $country_code
+   *   Country code.
+   *
+   * @see https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
+   */
+  public function setCountryCode($country_code) {
+    $this->data['countryCode'] = strtoupper($country_code);
+  }
+
+  /**
+   * Get country code.
+   *
+   * @return string
+   *   Country code.
+   */
+  public function getCountryCode() {
+    return $this->data['countryCode'];
   }
 
   /**
