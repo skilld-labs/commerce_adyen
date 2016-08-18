@@ -6,6 +6,8 @@
 
 namespace Commerce\Adyen\Payment\Controller;
 
+use Commerce\Adyen\Payment\Authorisation\Request;
+
 /**
  * Class Payment.
  *
@@ -19,11 +21,27 @@ abstract class Payment extends Controller {
    * @var array
    */
   private $data = [];
+  /**
+   * An instance of payment request.
+   *
+   * @var Request
+   */
+  protected $payment;
 
   /**
    * Build the data.
    */
   abstract protected function build();
+
+  /**
+   * Set an instance of payment request.
+   *
+   * @param Request $payment
+   *   An instance of payment request.
+   */
+  public function setPayment(Request $payment) {
+    $this->payment = $payment;
+  }
 
   /**
    * Data can be set only by child class.
