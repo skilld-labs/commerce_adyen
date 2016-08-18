@@ -55,6 +55,31 @@ class Transaction extends Utils\Transaction {
   }
 
   /**
+   * Pending a transaction.
+   *
+   * @param string|int $remote_id
+   *   Remote identifier of a payment transaction.
+   */
+  public function pending($remote_id) {
+    $this->setRemoteId($remote_id);
+    $this->setStatus(COMMERCE_PAYMENT_STATUS_PENDING);
+    $this->setRemoteStatus(COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_PENDING);
+    $this->setMessage('Payment has been successfully set to pending');
+  }
+
+  /**
+   * Check if payment was only pending and waiting for authorised.
+   *
+   * @return bool
+   *   A state of check.
+   */
+  public function isPending() {
+    return
+      $this->getStatus() === COMMERCE_PAYMENT_STATUS_PENDING &&
+      $this->getRemoteStatus() === COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_PENDING;
+  }
+
+  /**
    * Fail a transaction.
    *
    * @param string|int $remote_id
@@ -63,7 +88,7 @@ class Transaction extends Utils\Transaction {
   public function fail($remote_id) {
     $this->setRemoteId($remote_id);
     $this->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
-    $this->setRemoteStatus(COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED);
+    $this->setRemoteStatus(COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_FAILURE);
     $this->setMessage('Payment failed.');
   }
 
@@ -76,7 +101,7 @@ class Transaction extends Utils\Transaction {
   public function isFailed() {
     return
       $this->getStatus() === COMMERCE_PAYMENT_STATUS_FAILURE &&
-      $this->getRemoteStatus() === COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED;
+      $this->getRemoteStatus() === COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_FAILURE;
   }
 
   /**

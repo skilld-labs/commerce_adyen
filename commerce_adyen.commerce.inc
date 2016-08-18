@@ -122,11 +122,12 @@ function commerce_adyen_commerce_order_update(\stdClass $order) {
 function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $order, \stdClass $data) {
   switch ($event_code) {
     case Payment\Notification::AUTHORISATION:
+    case Payment\Notification::PENDING:
       $transaction = new Payment\Transaction($order);
 
       if ($data->success) {
-        if (!$transaction->isAuthorised()) {
-          $transaction->authorise($data->pspReference);
+        if (!$transaction->{'is' . Payment\Notification::PENDING == $event_code ? 'Pending' : 'Authorised'}()) {
+          $transaction->{Payment\Notification::PENDING == $event_code ? 'pending' : 'authorise'}($data->pspReference);
           commerce_payment_redirect_pane_next_page($order);
         }
       }

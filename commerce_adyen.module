@@ -28,6 +28,14 @@ define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_CAPTURED', 'captured');
  * Remote status of a payment. Payment authorised on Adyen side.
  */
 define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED', 'authorised');
+/**
+ * Remote status of a payment. Payment pending on Adyen side.
+ */
+define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_PENDING', 'pending');
+/**
+ * Remote status of a payment. Payment failure on Adyen side.
+ */
+define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_FAILURE', 'failure');
 
 use Commerce\Adyen\Payment;
 

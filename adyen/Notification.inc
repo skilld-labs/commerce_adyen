@@ -18,6 +18,7 @@ abstract class Notification {
   const AUTHORISATION = 'AUTHORISATION';
   const CANCELLATION = 'CANCELLATION';
   const REFUND = 'REFUND';
+  const PENDING = 'PENDING';
   const CANCEL_OR_REFUND = 'CANCEL_OR_REFUND';
   const CAPTURE = 'CAPTURE';
   const REFUNDED_REVERSED = 'REFUNDED_REVERSED';
