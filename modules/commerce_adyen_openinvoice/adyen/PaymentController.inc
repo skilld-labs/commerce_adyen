@@ -57,7 +57,7 @@ class PaymentController extends Payment {
   protected function build() {
     $order = $this->getOrder();
 
-    $this->set('brandCode', $this->config['type']);
+    $this->payment->setBrandCode($this->config['type']);
     $this->addShopperInformation(new Shopper(), $order->commerce_customer_billing);
     $this->addAddress(new Address(Address::BILLING), $order->commerce_customer_billing);
     $this->addAddress(new Address(Address::DELIVERY), $order->commerce_customer_shipping);
@@ -137,11 +137,15 @@ class PaymentController extends Payment {
 
     // Add shopper birth date if field exists.
     if (isset($billing->commerce_adyen_birth_date)) {
-      $birth = strtotime($billing->commerce_adyen_birth_date->value());
+      $birth = $billing->commerce_adyen_birth_date->value();
 
       $shopper->setDateOfBirthYear(date('Y', $birth));
       $shopper->setDateOfBirthMonth(date('m', $birth));
       $shopper->setDateOfBirthDayOfMonth(date('d', $birth));
+    }
+
+    if (isset($billing->commerce_adyen_social_number)) {
+      $shopper->setSocialSecurityNumber($billing->commerce_adyen_social_number->value());
     }
 
     if (isset($address['first_name'])) {
@@ -170,6 +174,7 @@ class PaymentController extends Payment {
     $this->set('shopper.dateOfBirthYear', $shopper->getDateOfBirthYear());
     $this->set('shopper.dateOfBirthMonth', $shopper->getDateOfBirthMonth());
     $this->set('shopper.dateOfBirthDayOfMonth', $shopper->getDateOfBirthDayOfMonth());
+    $this->set('shopper.socialSecurityNumber', $shopper->getSocialSecurityNumber());
   }
 
   /**
