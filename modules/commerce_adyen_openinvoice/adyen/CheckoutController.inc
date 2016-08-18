@@ -44,12 +44,18 @@ class CheckoutController extends Checkout {
       'type' => 'datestamp',
       'label' => t('Date of birth'),
       'settings' => [
-        'year_range' => '-100:-5',
+        // By OpenInvoice specification you must be older than 18 year.
+        'year_range' => '-100:-18',
         'granularity' => drupal_map_assoc(['year', 'month', 'day']),
       ],
       'widget' => [
         'input_format' => 'd/m/Y',
       ],
+    ];
+
+    $fields['social_number'] = [
+      'type' => 'text',
+      'label' => t('Social security number'),
     ];
 
     foreach ($fields as $name => $info) {
@@ -72,30 +78,40 @@ class CheckoutController extends Checkout {
 
     $form['gender'] = [
       '#type' => 'radios',
-      '#title' => t('Gender'),
       '#options' => $fields['gender']['settings']['allowed_values'],
     ];
 
     $form['phone_number'] = [
       '#type' => 'textfield',
-      '#title' => t('Phone'),
     ];
 
     $form['birth_date'] = [
       '#type' => 'date_select',
-      '#title' => t('Date of birth'),
       '#date_format' => $fields['birth_date']['widget']['input_format'],
       '#date_year_range' => $fields['birth_date']['settings']['year_range'],
     ];
 
-    foreach ($form as $item => $definition) {
-      $field_name = COMMERCE_ADYEN_PAYMENT_METHOD . '_' . $item;
+    $form['social_number'] = [
+      '#type' => 'textfield',
+    ];
 
-      $form[$item] += [
-        '#required' => !empty($fields[$item]['required']),
+    foreach ($fields as $field => $specification) {
+      $field_name = COMMERCE_ADYEN_PAYMENT_METHOD . '_' . $field;
+
+      $form[$field] += [
+        '#title' => $fields[$field]['label'],
+        '#required' => !empty($fields[$field]['required']),
         '#default_value' => isset($billing->{$field_name}) ? $billing->{$field_name}->value() : NULL,
       ];
     }
+
+    // The "date_default_date()" function will not handle UNIX timestamps
+    // correctly because third argument will be passed to constructor of
+    // the "\DateObject" object in any case.
+    // @see date_default_date()
+    // @see \DateObject::__construct()
+    // @todo This line should be removed and patch to "date" module created.
+    $form['birth_date']['#default_value'] = date('Y-m-d', $form['birth_date']['#default_value']);
 
     return $form;
   }
