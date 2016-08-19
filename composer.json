@@ -1,6 +1,5 @@
 {
   "require": {
-    "adyen/php-api-library": "1.*",
-    "germanoricardi/brazilian-helper": "*"
+    "adyen/php-api-library": "1.*"
   }
 }
