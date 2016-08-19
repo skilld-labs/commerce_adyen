@@ -77,6 +77,7 @@ class PaymentController extends Payment {
       $line_item_type = $line_item->type->value();
       $currency_code = $line_item->commerce_unit_price->currency_code->value();
       $vat_amount = commerce_adyen_amount(commerce_vat_total_amount($line_item_total['data']['components'], TRUE, $currency_code), $currency_code);
+      $item++;
 
       if (in_array($line_item_type, $product_line_item_types)) {
         $name = $line_item->commerce_product->title->value();
@@ -85,17 +86,20 @@ class PaymentController extends Payment {
         $name = $line_item->line_item_label->value();
       }
 
-      $item++;
-      $this->set("openinvoicedata.line.$item.itemAmount", commerce_adyen_amount($line_item->commerce_unit_price->amount->value(), $currency_code));
-      $this->set("openinvoicedata.line.$item.description", "$name [$line_item_type]");
-      $this->set("openinvoicedata.line.$item.currencyCode", $currency_code);
-      $this->set("openinvoicedata.line.$item.numberOfItems", (int) $line_item->quantity->value());
-      // Can be one these values: "High", "Low", "None".
-      $this->set("openinvoicedata.line.$item.vatCategory", $vat_category);
-      // Value must be represented in minor units. E.g. "3 Euro" is "300".
-      $this->set("openinvoicedata.line.$item.itemVatAmount", $vat_amount);
-      // Value must be represented in minor units. E.g. "7%" is "700".
-      $this->set("openinvoicedata.line.$item.itemVatPercentage", $vat_amount > 0 ? ($line_item_total['amount'] * 100 / $vat_amount) : 0);
+      foreach ([
+        'itemAmount' => commerce_adyen_amount($line_item->commerce_unit_price->amount->value(), $currency_code),
+        'description' => "$name [$line_item_type]",
+        'currencyCode' => $currency_code,
+        'numberOfItems' => (int) $line_item->quantity->value(),
+        // Can be one these values: "High", "Low", "None".
+        'vatCategory' => $vat_category,
+        // Value must be represented in minor units. E.g. "3 Euro" is "300".
+        'itemVatAmount' => $vat_amount,
+        // Value must be represented in minor units. E.g. "7%" is "700".
+        'itemVatPercentage' => $vat_amount > 0 ? ($line_item_total['amount'] * 100 / $vat_amount) : 0,
+      ] as $field => $value) {
+        $this->set("openinvoicedata.line$item.$field", $value);
+      }
     }
 
     $this->set('openinvoicedata.numberOfLines', $item);
