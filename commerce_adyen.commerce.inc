@@ -126,7 +126,7 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
       $transaction = new Payment\Transaction($order);
 
       if ($data->success) {
-        if (!$transaction->{'is' . Payment\Notification::PENDING == $event_code ? 'Pending' : 'Authorised'}()) {
+        if (!$transaction->{'is' . (Payment\Notification::PENDING == $event_code ? 'Pending' : 'Authorised')}()) {
           $transaction->{Payment\Notification::PENDING == $event_code ? 'pending' : 'authorise'}($data->pspReference);
           commerce_payment_redirect_pane_next_page($order);
         }
