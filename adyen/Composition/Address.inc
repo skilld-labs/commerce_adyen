@@ -67,10 +67,8 @@ class Address {
    * @param string $type
    *   Address type. Use one of constants of this class.
    */
-  public function __construct($type = NULL) {
-    if (NULL !== $type) {
-      $this->setType($type);
-    }
+  public function __construct($type) {
+    $this->setType($type);
   }
 
   /**
