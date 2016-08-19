@@ -24,9 +24,13 @@ class Request extends Signature {
    */
   const ENDPOINT_PAY = 'pay';
   /**
-   * Sent the request there to select the payment method.
+   * Send the request there to select the payment method.
    */
   const ENDPOINT_SELECT = 'select';
+  /**
+   * Send the request to edit the payment details.
+   */
+  const ENDPOINT_DETAILS = 'details';
   /**
    * Send the request there together with "brandCode"
    * parameter to skip payment method selection.
@@ -389,7 +393,8 @@ class Request extends Signature {
    * Set recurring contract type.
    *
    * @param string $recurring_contract
-   *   Recurring contract type. Use one constants only.
+   *   Recurring contract type. Use one constants only. Keep in mind
+   *   that PayPal does not allow to use "ONECLICK,RECURRING" type.
    * @param string $payment_reference
    *   PSP reference of a payment or "LATEST" to use latest one.
    *
@@ -444,8 +449,10 @@ class Request extends Signature {
   public function extend(Payment\Controller\Payment $payment) {
     $payment->setOrder($this->orderWrapper);
     $payment->setPayment($this);
-
-    $this->data = array_merge($this->data, $payment->getData());
+    // This value MUST be saved into a variable because for the
+    // payment object is allowed to modify values in "$this->data".
+    $payment_data = $payment->getData();
+    $this->data = array_merge($this->data, $payment_data);
   }
 
   /**
@@ -477,7 +484,7 @@ class Request extends Signature {
    *   An endpoint type to send the request.
    */
   public function setEndpoint($endpoint) {
-    if (!in_array($endpoint, [static::ENDPOINT_PAY, static::ENDPOINT_SELECT, static::ENDPOINT_SKIP_DETAILS])) {
+    if (!in_array($endpoint, (new \ReflectionClass($this))->getConstants())) {
       throw new \InvalidArgumentException(t('Endpoint for payment request is incorrect!'));
     }
 
