@@ -78,7 +78,20 @@ abstract class Payment extends Controller {
    *   Form items.
    */
   public function configForm() {
-    return [];
+    $form = [];
+
+    $form['state'] = [
+      '#type' => 'select',
+      '#title' => t('State'),
+      '#default_value' => 0,
+      '#options' => [
+        t('Fields are visible and modifiable'),
+        t('Fields are visible but unmodifiable'),
+        t('Fields are not visible and unmodifiable'),
+      ],
+    ];
+
+    return $form;
   }
 
   /**
@@ -131,6 +144,10 @@ abstract class Payment extends Controller {
    */
   protected function addShopperInformation(Shopper $shopper, \EntityDrupalWrapper $billing) {
     $address = $billing->commerce_customer_address->value();
+
+    if (!empty($this->config['state'])) {
+      $this->set('shopperType', $this->config['state']);
+    }
 
     // Add shopper gender if field exists.
     if (isset($billing->commerce_adyen_gender)) {
@@ -201,17 +218,12 @@ abstract class Payment extends Controller {
    *   OpenInvoice address.
    * @param \EntityDrupalWrapper $profile
    *   Commerce customer profile.
-   * @param int|string $state
-   *   Possible values:
-   *   - 0: Fields are visible and modifiable.
-   *   - 1: Fields are visible but unmodifiable.
-   *   - 2: Fields are not visible and unmodifiable.
    */
-  protected function addAddress(Address $address, \EntityDrupalWrapper $profile, $state) {
+  protected function addAddress(Address $address, \EntityDrupalWrapper $profile) {
     $type = $address->getType() . 'Address';
 
-    if (is_numeric($state) && $state > 0) {
-      $this->set($type . 'Type', $state);
+    if (!empty($this->config['state'])) {
+      $this->set($type . 'Type', $this->config['state']);
     }
 
     // Prefill data from address from customer profile.
