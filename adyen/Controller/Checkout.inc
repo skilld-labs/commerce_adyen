@@ -16,8 +16,17 @@ abstract class Checkout extends Controller {
   /**
    * Field definitions to add to "billing" customer profile.
    *
+   * The following fields are supported out of the box:
+   * - gender
+   * - birth_date
+   * - phone_number
+   * - social_number
+   *
    * @return array[]
    *   Field definitions.
+   *
+   * @see \Commerce\Adyen\Payment\OpenInvoice\CheckoutController::checkoutFields()
+   * @see \Commerce\Adyen\Payment\Controller\Payment::addShopperInformation()
    */
   abstract public function checkoutFields();
 
