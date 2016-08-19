@@ -24,7 +24,7 @@ class PaymentController extends Payment {
     $order = $this->getOrder();
 
     $this->addShopperInformation(new Shopper(), $order->commerce_customer_billing);
-    $this->addAddress(new Address(Address::BILLING), $order->commerce_customer_billing, 0);
+    $this->addAddress(new Address(Address::BILLING), $order->commerce_customer_billing);
   }
 
 }

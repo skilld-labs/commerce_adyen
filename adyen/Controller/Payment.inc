@@ -95,46 +95,6 @@ abstract class Payment extends Controller {
   }
 
   /**
-   * Add line items.
-   *
-   * @param \EntityListWrapper $line_items
-   *   Line items list.
-   * @param string $vat_category
-   *   Can be one these values: "High", "Low", "None".
-   */
-  protected function addLineItems(\EntityListWrapper $line_items, $vat_category) {
-    $product_line_item_types = commerce_product_line_item_types();
-    $item = 0;
-
-    foreach ($line_items as $line_item) {
-      $line_item_total = $line_item->commerce_total->value();
-      $line_item_type = $line_item->type->value();
-      $currency_code = $line_item->commerce_unit_price->currency_code->value();
-      $vat_amount = commerce_adyen_amount(commerce_vat_total_amount($line_item_total['data']['components'], TRUE, $currency_code), $currency_code);
-
-      if (in_array($line_item_type, $product_line_item_types)) {
-        $name = $line_item->commerce_product->title->value();
-      }
-      else {
-        $name = $line_item->line_item_label->value();
-      }
-
-      $item++;
-      $this->set("openinvoicedata.line.$item.itemAmount", commerce_adyen_amount($line_item->commerce_unit_price->amount->value(), $currency_code));
-      $this->set("openinvoicedata.line.$item.description", "$name [$line_item_type]");
-      $this->set("openinvoicedata.line.$item.currencyCode", $currency_code);
-      $this->set("openinvoicedata.line.$item.numberOfItems", (int) $line_item->quantity->value());
-      $this->set("openinvoicedata.line.$item.vatCategory", $vat_category);
-      // Value must be represented in minor units. E.g. "3 Euro" is "300".
-      $this->set("openinvoicedata.line.$item.itemVatAmount", $vat_amount);
-      // Value must be represented in minor units. E.g. "7%" is "700".
-      $this->set("openinvoicedata.line.$item.itemVatPercentage", $vat_amount > 0 ? ($line_item_total['amount'] * 100 / $vat_amount) : 0);
-    }
-
-    $this->set('openinvoicedata.numberOfLines', $item);
-  }
-
-  /**
    * Add shopper information.
    *
    * @param Shopper $shopper
@@ -180,12 +140,6 @@ abstract class Payment extends Controller {
       $shopper->setLastName($address['last_name']);
     }
 
-    if (isset($address['name_line'])) {
-      $this->set('openinvoicedata.refundDescription', t('Refund to @customer', [
-        '@customer' => $address['name_line'],
-      ]));
-    }
-
     // Allow other modules alter the address.
     drupal_alter('commerce_adyen_shopper_information', $shopper, $this->getOrder(), $billing);
 
@@ -215,7 +169,7 @@ abstract class Payment extends Controller {
    * Add address.
    *
    * @param Address $address
-   *   OpenInvoice address.
+   *   Shopper address.
    * @param \EntityDrupalWrapper $profile
    *   Commerce customer profile.
    */
@@ -250,7 +204,7 @@ abstract class Payment extends Controller {
     }
 
     if (isset($profile_address['premise'])) {
-      $address->setStateOrProvince($profile_address['premise']);
+      $address->setHouseNumberOrName($profile_address['premise']);
     }
 
     // Allow other modules alter the address.
@@ -269,7 +223,7 @@ abstract class Payment extends Controller {
    * Validate address.
    *
    * @param Address $address
-   *   OpenInvoice address.
+   *   Shopper address.
    */
   protected function validateAddress(Address $address) {
     // @todo Add validation.
