@@ -53,6 +53,9 @@ class PaymentController extends Payment {
     $this->addAddress(new Address(Address::DELIVERY), $order->commerce_customer_shipping);
     $this->addLineItems($order->commerce_line_items);
 
+    // Auto agreement with terms and conditions. Will be used for DE and AT.
+    // @see https://github.com/Adyen/adyen-magento2/blob/46c6758b3fc472a52a0bf5a7dd2fbf184bfcd970/Block/Redirect/Redirect.php#L276
+    $this->set($this->config['type'] . '.acceptPrivacyPolicy', 'true');
     $this->set('openinvoicedata.refundDescription', t('Refund to @first_name @last_name', [
       '@first_name' => $shopper->getFirstName(),
       '@last_name' => $shopper->getLastName(),
@@ -66,29 +69,22 @@ class PaymentController extends Payment {
    *   Line items list.
    */
   protected function addLineItems(\EntityListWrapper $line_items) {
-    $product_line_item_types = commerce_product_line_item_types();
-    // @todo Why?
-    // @see https://github.com/Adyen/magento/commit/9c27b78f8d08972c126df57c3133b67dce4a645e
-    $vat_category = static::AFTERPAY === $this->config['type'] ? 'High' : 'None';
+    // @see https://github.com/Adyen/adyen-magento2/blob/46c6758b3fc472a52a0bf5a7dd2fbf184bfcd970/Block/Redirect/Redirect.php#L459
+    $vat_category = static::AFTERPAY === $this->config['type'] ? 'None' : 'High';
     $item = 0;
 
+    /* @var \EntityMetadataWrapper $label */
     foreach ($line_items as $line_item) {
       $line_item_total = $line_item->commerce_total->value();
       $line_item_type = $line_item->type->value();
       $currency_code = $line_item->commerce_unit_price->currency_code->value();
       $vat_amount = commerce_adyen_amount(commerce_vat_total_amount($line_item_total['data']['components'], TRUE, $currency_code), $currency_code);
+      $label = isset($line_item->commerce_product) ? $line_item->commerce_product->title : $line_item->line_item_label;
       $item++;
-
-      if (in_array($line_item_type, $product_line_item_types)) {
-        $name = $line_item->commerce_product->title->value();
-      }
-      else {
-        $name = $line_item->line_item_label->value();
-      }
 
       foreach ([
         'itemAmount' => commerce_adyen_amount($line_item->commerce_unit_price->amount->value(), $currency_code),
-        'description' => "$name [$line_item_type]",
+        'description' => "{$label->value()} [$line_item_type]",
         'currencyCode' => $currency_code,
         'numberOfItems' => (int) $line_item->quantity->value(),
         // Can be one these values: "High", "Low", "None".
