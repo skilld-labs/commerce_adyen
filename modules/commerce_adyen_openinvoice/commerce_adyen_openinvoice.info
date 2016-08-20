@@ -6,6 +6,7 @@ php = 5.5
 
 autoload[adyen][] = Commerce\Adyen\Payment\OpenInvoice
 
+dependencies[] = date
 dependencies[] = commerce_vat
 dependencies[] = commerce_adyen
 dependencies[] = commerce_customer
