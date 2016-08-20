@@ -125,13 +125,13 @@ class Request extends Signature {
   }
 
   /**
-   * Get brand code of a payment.
+   * Get currency code.
    *
    * @return string
-   *   Brand code of a payment.
+   *   Currency code.
    */
-  public function getBrandCode() {
-    return $this->data['brandCode'];
+  public function getCurrencyCode() {
+    return $this->data['currencyCode'];
   }
 
   /**
@@ -145,13 +145,13 @@ class Request extends Signature {
   }
 
   /**
-   * Get currency code.
+   * Get brand code of a payment.
    *
    * @return string
-   *   Currency code.
+   *   Brand code of a payment.
    */
-  public function getCurrencyCode() {
-    return $this->data['currencyCode'];
+  public function getBrandCode() {
+    return $this->data['brandCode'];
   }
 
   /**
@@ -423,6 +423,32 @@ class Request extends Signature {
   }
 
   /**
+   * Set endpoint type.
+   *
+   * @param string $endpoint
+   *   An endpoint type to send the request.
+   */
+  public function setEndpoint($endpoint) {
+    if (!in_array($endpoint, (new \ReflectionClass($this))->getConstants())) {
+      throw new \InvalidArgumentException(t('Endpoint for payment request is incorrect!'));
+    }
+
+    $this->endpoint = $endpoint;
+  }
+
+  /**
+   * Returns endpoint URL.
+   *
+   * @link https://docs.adyen.com/developers/hpp-manual#hppendpoints
+   *
+   * @return string
+   *   Endpoint URL.
+   */
+  public function getEndpoint() {
+    return sprintf('https://%s.adyen.com/hpp/%s.shtml', $this->paymentMethod['settings']['mode'], $this->endpoint);
+  }
+
+  /**
    * Get recurring contract details.
    *
    * @return array
@@ -463,32 +489,6 @@ class Request extends Signature {
     // they complete a payment on the HPP.
     $this->data['resURL'] = url('checkout/' . $this->order->order_id . '/payment/return/' . $this->order->data['payment_redirect_key'], ['absolute' => TRUE]);
     $this->data['merchantSig'] = $this->getSignature();
-  }
-
-  /**
-   * Returns endpoint URL.
-   *
-   * @link https://docs.adyen.com/developers/hpp-manual#hppendpoints
-   *
-   * @return string
-   *   Endpoint URL.
-   */
-  public function getEndpoint() {
-    return sprintf('https://%s.adyen.com/hpp/%s.shtml', $this->paymentMethod['settings']['mode'], $this->endpoint);
-  }
-
-  /**
-   * Set endpoint type.
-   *
-   * @param string $endpoint
-   *   An endpoint type to send the request.
-   */
-  public function setEndpoint($endpoint) {
-    if (!in_array($endpoint, (new \ReflectionClass($this))->getConstants())) {
-      throw new \InvalidArgumentException(t('Endpoint for payment request is incorrect!'));
-    }
-
-    $this->endpoint = $endpoint;
   }
 
 }
