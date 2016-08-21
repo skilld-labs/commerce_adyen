@@ -23,6 +23,8 @@ abstract class Controller {
    * Configuration of payment type. Here be the values
    * from "configFrom" method of payment controller.
    *
+   * @see \Commerce\Adyen\Payment\Controller\Payment::configForm()
+   *
    * @var array
    */
   protected $config = [];
