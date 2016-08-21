@@ -78,7 +78,18 @@ abstract class Payment extends Controller {
    *   Form items.
    */
   public function configForm() {
+    $subtypes = static::subTypes();
     $form = [];
+
+    if (!empty($subtypes)) {
+      $form['type'] = [
+        '#type' => 'select',
+        '#title' => t('Type'),
+        '#options' => $subtypes,
+        '#description' => t('Select subtype of payment. You can leave it empty and select afterwards on Adyen HPP.'),
+        '#empty_option' => t('- None -'),
+      ];
+    }
 
     $form['state'] = [
       '#type' => 'select',
@@ -92,6 +103,17 @@ abstract class Payment extends Controller {
     ];
 
     return $form;
+  }
+
+  /**
+   * List of payment subtypes.
+   *
+   * @return string[]
+   *   An associative array where key - is a machine name
+   *   of subtype and value - human-readable label.
+   */
+  protected static function subTypes() {
+    return [];
   }
 
   /**
