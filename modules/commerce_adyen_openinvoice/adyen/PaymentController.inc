@@ -24,20 +24,11 @@ class PaymentController extends Payment {
   /**
    * {@inheritdoc}
    */
-  public function configForm() {
-    $form = [];
-
-    $form['type'] = [
-      '#type' => 'select',
-      '#title' => t('Type'),
-      '#default_value' => static::KLARNA,
-      '#options' => [
-        static::KLARNA => 'Klarna',
-        static::AFTERPAY => 'AfterPay',
-      ],
+  protected static function subTypes() {
+    return [
+      static::KLARNA => 'Klarna',
+      static::AFTERPAY => 'AfterPay',
     ];
-
-    return $form + parent::configForm();
   }
 
   /**
@@ -47,7 +38,10 @@ class PaymentController extends Payment {
     $order = $this->getOrder();
     $shopper = new Shopper();
 
-    $this->payment->setBrandCode($this->config['type']);
+    if (!empty($this->config['type'])) {
+      $this->payment->setBrandCode($this->config['type']);
+    }
+
     // The billing and delivery address must match. Do not offer an alternative,
     // different delivery address for Klarna shoppers from your end, since this
     // would cause a billing/delivery address mismatch, and payments would fail.
