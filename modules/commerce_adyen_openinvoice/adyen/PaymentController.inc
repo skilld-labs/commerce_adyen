@@ -40,6 +40,10 @@ class PaymentController extends Payment {
 
     if (!empty($this->config['type'])) {
       $this->payment->setBrandCode($this->config['type']);
+      // Auto agreement with terms and conditions. Will be used for DE and AT.
+      // Note, that this will work only on "SKIP_DETAILS" endpoint.
+      // @see https://github.com/Adyen/adyen-magento2/blob/46c6758b3fc472a52a0bf5a7dd2fbf184bfcd970/Block/Redirect/Redirect.php#L276
+      $this->set($this->config['type'] . '.acceptPrivacyPolicy', 'true');
     }
 
     // The billing and delivery address must match. Do not offer an alternative,
@@ -52,10 +56,6 @@ class PaymentController extends Payment {
     $this->addLineItems($order->commerce_line_items);
     $this->addShopperInformation($shopper, $order->commerce_customer_billing);
 
-    // Auto agreement with terms and conditions. Will be used for DE and AT.
-    // Note, that this will work only on "SKIP_DETAILS" endpoint.
-    // @see https://github.com/Adyen/adyen-magento2/blob/46c6758b3fc472a52a0bf5a7dd2fbf184bfcd970/Block/Redirect/Redirect.php#L276
-    $this->set($this->config['type'] . '.acceptPrivacyPolicy', 'true');
     $this->set('openinvoicedata.refundDescription', t('Refund to @first_name @last_name', [
       '@first_name' => $shopper->getFirstName(),
       '@last_name' => $shopper->getLastName(),
@@ -70,7 +70,7 @@ class PaymentController extends Payment {
    */
   protected function addLineItems(\EntityListWrapper $line_items) {
     // @see https://github.com/Adyen/adyen-magento2/blob/46c6758b3fc472a52a0bf5a7dd2fbf184bfcd970/Block/Redirect/Redirect.php#L459
-    $vat_category = static::AFTERPAY === $this->config['type'] ? 'None' : 'High';
+    $vat_category = empty($this->config['type']) || static::AFTERPAY === $this->config['type'] ? 'None' : 'High';
     $item = 0;
 
     /* @var \EntityMetadataWrapper $label */
