@@ -346,13 +346,12 @@ function commerce_adyen_redirect_form_validate(\stdClass $order, array $payment_
     switch ($status) {
       case $payment::AUTHORISED:
       case $payment::PENDING:
-        // Allow to authorise|pending the payment on local environments where
+        // Allow to authorise/pending the payment on local environments where
         // notifications are not available. Capturing must be done
         // manually from Adyen backend.
         if (variable_get('commerce_adyen_authorise_forcibly', FALSE)) {
-          $transaction = new Payment\Transaction($order);
-          $transaction->{$payment::PENDING === $status ? 'pending' : 'authorise'}($_GET['pspReference']);
-          $transaction->setPayload($_GET);
+          $transaction = $payment->getTransaction();
+          $transaction->{$payment::PENDING === $status ? 'pending' : 'authorise'}($transaction->getRemoteId());
           $transaction->save();
         }
         break;
