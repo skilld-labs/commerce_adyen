@@ -92,7 +92,7 @@ class PaymentController extends Payment {
         // Value must be represented in minor units. E.g. "3 Euro" is "300".
         'itemVatAmount' => $vat_amount,
         // Value must be represented in minor units. E.g. "7%" is "700".
-        'itemVatPercentage' => (int) ($vat_amount > 0 ? ($line_item_total['amount'] * 100 / $vat_amount) : 0),
+        'itemVatPercentage' => $vat_amount > 0 ? commerce_round(COMMERCE_ROUND_HALF_UP, $line_item_total['amount'] * 100 / $vat_amount) : 0,
       ] as $field => $value) {
         $this->set("openinvoicedata.line$item.$field", $value);
       }
