@@ -10,6 +10,7 @@
 function commerce_adyen_rules_action_info() {
   $actions = [];
 
+  // @see commerce_adyen_capture_request()
   $actions['commerce_adyen_capture_request'] = [
     'label' => t('Adyen capture request'),
     'group' => 'Commerce Order',
@@ -18,9 +19,6 @@ function commerce_adyen_rules_action_info() {
         'type' => 'commerce_order',
         'label' => t('Commerce order'),
       ],
-    ],
-    'callbacks' => [
-      'execute' => 'commerce_adyen_capture_request',
     ],
   ];
 
@@ -41,42 +39,4 @@ function commerce_adyen_rules_event_info() {
   ];
 
   return $events;
-}
-
-/**
- * Capture request.
- *
- * @see commerce_adyen_rules_action_info()
- *
- * @param \stdClass $order
- *   Commerce order.
- */
-function commerce_adyen_capture_request(\stdClass $order) {
-  try {
-    $capture = new \Commerce\Adyen\Payment\Capture($order);
-    $options = ['%order_number' => $order->order_number];
-
-    if (empty($order->data['adyen_capture_sent'])) {
-      if ($capture->isAvailable()) {
-        if ($capture->request()) {
-          // Mark that we don't need to resend the capture
-          // request once we successfully did this.
-          $order->data['adyen_capture_sent'] = TRUE;
-          // Save the order.
-          commerce_order_save($order);
-          // Inform about capturing.
-          watchdog(COMMERCE_ADYEN_PAYMENT_METHOD, 'Capture request for the %order_number order was received by Adyen.', $options);
-        }
-        else {
-          throw new \RuntimeException(t('Capture request for the %order_number order was rejected by Adyen.', $options));
-        }
-      }
-      else {
-        throw new \RuntimeException(t('Capture request cannot be performed for the %order_number order because it have no authorised Adyen transactions.', $options));
-      }
-    }
-  }
-  catch (\Exception $e) {
-    watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
-  }
 }

@@ -136,6 +136,52 @@ function commerce_adyen_payment_types() {
 }
 
 /**
+ * Payment capture request.
+ *
+ * @param \stdClass $order
+ *   An instance of "commerce_order" entity.
+ *
+ * @see commerce_adyen_rules_action_info()
+ */
+function commerce_adyen_capture_request(\stdClass $order) {
+  $flag = COMMERCE_ADYEN_PAYMENT_METHOD . '_capture_sent';
+
+  try {
+    if (!isset($order->order_id, $order->order_number)) {
+      throw new \InvalidArgumentException(t('An argument is not a valid object of the "@entity_type" entity.', [
+        '@entity_type' => 'commerce_order',
+      ]));
+    }
+
+    if (empty($order->data[$flag])) {
+      $capture = new Payment\Capture($order);
+      $options = ['%order_number' => $order->order_number];
+
+      if ($capture->isAvailable()) {
+        if ($capture->request()) {
+          // Mark that we don't need to resend the capture
+          // request once we successfully did this.
+          $order->data[$flag] = TRUE;
+          // Save the order.
+          commerce_order_save($order);
+          // Inform about capturing.
+          watchdog(COMMERCE_ADYEN_PAYMENT_METHOD, 'Capture request for the %order_number order was received by Adyen.', $options);
+        }
+        else {
+          throw new \RuntimeException(t('Capture request for the %order_number order was rejected by Adyen.', $options));
+        }
+      }
+      else {
+        throw new \RuntimeException(t('Capture request cannot be performed for the %order_number order because it have no authorised Adyen transactions.', $options));
+      }
+    }
+  }
+  catch (\Exception $e) {
+    watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
+  }
+}
+
+/**
  * Process an amount due to strange behavior regarding some currencies.
  *
  * This function must be called for every price amount and all logic
