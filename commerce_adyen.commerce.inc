@@ -123,19 +123,38 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
   switch ($event_code) {
     case Payment\Notification::AUTHORISATION:
     case Payment\Notification::PENDING:
+      // Load/create transaction object.
       $transaction = new Payment\Transaction($order);
 
       if ($data->success) {
-        $is_pending = Payment\Notification::PENDING === $event_code;
+        if (Payment\Notification::AUTHORISATION === $event_code) {
+          if (!$transaction->isAuthorised()) {
+            $transaction->authorise($data->pspReference);
 
-        if (!$transaction->{'is' . ($is_pending ? 'Pending' : 'Authorised')}()) {
-          $transaction->{$is_pending ? 'pending' : 'authorise'}($data->pspReference);
-          commerce_payment_redirect_pane_next_page($order);
+            // Send capture request automatically.
+            commerce_adyen_capture_request($order);
+            commerce_payment_redirect_pane_next_page($order);
+          }
+        }
+        // This state is available in case of "Boleto"
+        // payments. Capturing is not needed.
+        elseif (Payment\Notification::PENDING === $event_code) {
+          if (!$transaction->isPending()) {
+            $transaction->pending($data->pspReference);
+
+            commerce_order_status_update($order, 'pending');
+            commerce_payment_redirect_pane_next_page($order);
+          }
         }
       }
       else {
-        $transaction->fail($data->pspReference);
-        commerce_payment_redirect_pane_previous_page($order);
+        // Allow to fail only new transaction because authorised or
+        // pending transaction were processed.
+        if ($transaction->isNew()) {
+          // Something went wrong: order isn't paid.
+          $transaction->fail($data->pspReference);
+          commerce_payment_redirect_pane_previous_page($order);
+        }
       }
       break;
 
@@ -145,10 +164,6 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
       if ($data->success && !$transaction->isFinalized()) {
         $transaction->finalize();
       }
-      break;
-
-    case Payment\Notification::CAPTURE_FAILED:
-      // @todo What should be implemented here?
       break;
 
     case Payment\Notification::CANCELLATION:
