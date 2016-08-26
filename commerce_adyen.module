@@ -48,7 +48,7 @@ function commerce_adyen_menu() {
   $items[COMMERCE_ADYEN_NOTIFICATION_URL] = [
     'type' => MENU_CALLBACK,
     'file' => 'includes/commerce_adyen.notification.inc',
-    'page callback' => 'commerce_adyen_notification_receiver',
+    'page callback' => 'commerce_adyen_notification',
     'access callback' => TRUE,
   ];
 

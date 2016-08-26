@@ -11,7 +11,7 @@
  *
  * @internal
  */
-function commerce_adyen_notification_receiver() {
+function commerce_adyen_notification() {
   $watchdog = function (\Exception $e = NULL) {
     $message = "Notification has been received. <pre>@data</pre>";
     $arguments = [
