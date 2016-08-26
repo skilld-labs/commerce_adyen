@@ -6,6 +6,8 @@
 
 namespace Commerce\Adyen\Payment\Controller;
 
+use Commerce\Adyen\Payment\Facade;
+
 /**
  * Class Checkout.
  *
@@ -13,16 +15,32 @@ namespace Commerce\Adyen\Payment\Controller;
  */
 abstract class Checkout extends Controller {
 
+  use Facade;
+
   /**
    * Field definitions to add to "billing" customer profile.
    *
+   * The following fields are supported out of the box:
+   * - gender
+   * - birth_date
+   * - phone_number
+   * - social_number
+   *
    * @return array[]
    *   Field definitions.
+   *
+   * @see \Commerce\Adyen\Payment\OpenInvoice\CheckoutController::checkoutFields()
+   * @see \Commerce\Adyen\Payment\Controller\Payment::addShopperInformation()
    */
   abstract public function checkoutFields();
 
   /**
    * Build checkout form to allow customers fill additional data.
+   *
+   * Note that "#title" and "#required" properties for every form element
+   * will be prefilled using values of "label" and "required" properties
+   * of field definition. The "#default_value" will be set using saved
+   * value in appropriate field in a billing profile of customer.
    *
    * @param \EntityDrupalWrapper $billing
    *   Commerce customer profile.

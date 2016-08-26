@@ -68,11 +68,7 @@ class Address {
    *   Address type. Use one of constants of this class.
    */
   public function __construct($type) {
-    if (!in_array($type, [static::BILLING, static::DELIVERY])) {
-      throw new \InvalidArgumentException('Adyen address type is incorrect!');
-    }
-
-    $this->type = $type;
+    $this->setType($type);
   }
 
   /**
@@ -80,6 +76,17 @@ class Address {
    */
   public function getType() {
     return $this->type;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setType($type) {
+    if (!in_array($type, [static::BILLING, static::DELIVERY])) {
+      throw new \InvalidArgumentException('Adyen address type is incorrect!');
+    }
+
+    $this->type = $type;
   }
 
   /**

@@ -1,7 +1,7 @@
 <?php
 /**
  * @file
- * Routes controllers for Adyen.
+ * Notifications receiver.
  */
 
 /**
@@ -11,7 +11,7 @@
  *
  * @internal
  */
-function commerce_adyen_notification() {
+function commerce_adyen_notification_receiver() {
   $watchdog = function (\Exception $e = NULL) {
     $message = "Notification has been received. <pre>@data</pre>";
     $arguments = [

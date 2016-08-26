@@ -22,7 +22,7 @@ trait Client {
    * @return \Adyen\Client
    *   Client object.
    */
-  public function getClient(array $payment_method) {
+  protected function getClient(array $payment_method) {
     $client = new \Adyen\Client();
     $client->setUsername($payment_method['settings']['client_user']);
     $client->setPassword($payment_method['settings']['client_password']);

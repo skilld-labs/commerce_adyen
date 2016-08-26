@@ -43,39 +43,41 @@ use Commerce\Adyen\Payment;
  * Implements hook_menu().
  */
 function commerce_adyen_menu() {
-  $info = [];
+  $items = [];
 
-  $info[COMMERCE_ADYEN_NOTIFICATION_URL] = [
+  $items[COMMERCE_ADYEN_NOTIFICATION_URL] = [
     'type' => MENU_CALLBACK,
     'file' => 'includes/commerce_adyen.notification.inc',
-    'page callback' => 'commerce_adyen_notification',
+    'page callback' => 'commerce_adyen_notification_receiver',
     'access callback' => TRUE,
   ];
 
-  return $info;
+  return $items;
 }
 
 /**
  * Implements hook_hook_info().
  */
 function commerce_adyen_hook_info() {
+  $api = module_load_include('api.php', 'commerce_adyen');
   $info = [];
+  $matches = [];
 
-  foreach ([
-    // @see hook_commerce_adyen_notification()
-    'notification',
-    // @see hook_commerce_adyen_capture_received()
-    'capture_received',
-    // @see hook_commerce_adyen_capture_rejected()
-    'capture_rejected',
-    // @see hook_commerce_adyen_payment_authorisation_request_alter()
-    'payment_authorisation_request_alter',
-    // @see hook_commerce_adyen_payment_authorisation_response_alter()
-    'payment_authorisation_response_alter',
-  ] as $hook) {
-    $info[COMMERCE_ADYEN_PAYMENT_METHOD . '_' . $hook] = [
-      'group' => 'commerce',
-    ];
+  if (FALSE === $api) {
+    throw new \RuntimeException(t('File "@file" with API documentations is not readable! Work of Commerce Adyen is impossible.', [
+      '@file' => $api,
+    ]));
+  }
+
+  // Read all function definitions from API documentation.
+  preg_match_all('/function\s+(' . DRUPAL_PHP_FUNCTION_PATTERN . ')/i', file_get_contents($api), $matches);
+
+  if (!empty($matches[1])) {
+    foreach (array_filter($matches[1], 'function_exists') as $hook) {
+      $info[str_replace('hook_', '', $hook)] = [
+        'group' => 'commerce',
+      ];
+    }
   }
 
   return $info;
@@ -138,6 +140,50 @@ function commerce_adyen_payment_types() {
 }
 
 /**
+ * Payment capture request.
+ *
+ * @param \stdClass $order
+ *   An instance of "commerce_order" entity.
+ *
+ * @see commerce_adyen_rules_action_info()
+ */
+function commerce_adyen_capture_request(\stdClass $order) {
+  $flag = COMMERCE_ADYEN_PAYMENT_METHOD . '_capture_sent';
+
+  try {
+    if (!isset($order->order_id, $order->order_number)) {
+      throw new \InvalidArgumentException(t('An argument is not a valid object of the "@entity_type" entity.', [
+        '@entity_type' => 'commerce_order',
+      ]));
+    }
+
+    if (empty($order->data[$flag])) {
+      $capture = new Payment\Capture($order);
+      $options = ['%order_number' => $order->order_number];
+
+      if ($capture->isAvailable()) {
+        if ($capture->request()) {
+          // Mark that we don't need to resend the capture
+          // request once we successfully did this.
+          $order->data[$flag] = TRUE;
+          // Save the order.
+          commerce_order_save($order);
+        }
+        else {
+          throw new \RuntimeException(t('Capture request for the %order_number order was rejected by Adyen.', $options));
+        }
+      }
+      else {
+        throw new \RuntimeException(t('Capture request cannot be performed for the %order_number order because it have no authorised Adyen transactions.', $options));
+      }
+    }
+  }
+  catch (\Exception $e) {
+    watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
+  }
+}
+
+/**
  * Process an amount due to strange behavior regarding some currencies.
  *
  * This function must be called for every price amount and all logic
@@ -162,4 +208,37 @@ function commerce_adyen_amount($amount, $currency) {
   }
 
   return $amount;
+}
+
+/**
+ * Instantiate payment controller.
+ *
+ * @param string $controller
+ *   One of controller types: "payment" or "checkout".
+ * @param string $payment_type
+ *   One of payment type names.
+ * @param array $settings
+ *   Payment method settings.
+ * @param array[] $payment_types
+ *   List of payment types. Must be result of "commerce_adyen_payment_types()".
+ *
+ * @return Payment\Controller\Payment|Payment\Controller\Checkout|NULL
+ *   NULL is payment type class cannot be instantiated.
+ */
+function commerce_adyen_invoke_controller($controller, $payment_type, array $settings = NULL, array $payment_types = NULL) {
+  if (NULL === $payment_types) {
+    $payment_types = commerce_adyen_payment_types();
+  }
+
+  if (!isset($payment_types[$payment_type]['controllers'][$controller])) {
+    return NULL;
+  }
+
+  if (NULL === $settings) {
+    $settings = commerce_payment_method_instance_load(COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE)['settings'];
+  }
+
+  return new $payment_types[$payment_type]['controllers'][$controller](
+    isset($settings['payment_types'][$payment_type]) ? $settings['payment_types'][$payment_type] : []
+  );
 }

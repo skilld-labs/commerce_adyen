@@ -17,31 +17,32 @@ use Commerce\Adyen\Payment;
  * @internal
  */
 function commerce_adyen_settings_form(array $settings) {
+  $notification_url = url(COMMERCE_ADYEN_NOTIFICATION_URL, ['absolute' => TRUE]);
   $payment_types = commerce_adyen_payment_types();
-  $payment_type = commerce_adyen_invoke_controller($settings, $payment_types);
-  $types = [];
+  $backend_link = sprintf('https://ca-%s.adyen.com/ca/ca', isset($settings['mode']) ? $settings['mode'] : \Adyen\Environment::TEST);
   $form = [];
 
-  foreach ($payment_types as $name => $data) {
-    $types[$name] = $data['label'];
-  }
-
-  $link = function ($title, $link) use ($settings) {
+  $link = function ($title, $link) use ($backend_link) {
     // @codingStandardsIgnoreStart
     return ' ' . t('You will find the right value in the <a href="@href" target="_blank">' . $title . '</a>.', [
       // @codingStandardsIgnoreEnd
-      '@href' => sprintf("https://ca-%s.adyen.com/ca/ca/$link", isset($settings['mode']) ? $settings['mode'] : \Adyen\Environment::TEST),
+      '@href' => "$backend_link/$link",
     ]);
   };
 
-  // The wrapper is needed to reload a part of form using AJAX.
-  $form['#prefix'] = '<div id="' . __FUNCTION__ . '">';
-  $form['#suffix'] = '</div>';
-
   $form['url'] = [
-    '#markup' => t('Please <a href="@notification_setup" target="_blank">configure your Adyen account</a> to send notifications to this URL: %notification_url.', [
+    '#markup' => t('Please <a href="@notification_setup" target="_blank">configure your Adyen account</a> to send notifications to this URL: %notification_url (@basic_auth_status).', [
       '@notification_setup' => 'https://docs.adyen.com/developers/api-manual#setupnotifications',
-      '%notification_url' => url(COMMERCE_ADYEN_NOTIFICATION_URL, ['absolute' => TRUE]),
+      '%notification_url' => $notification_url,
+      '@basic_auth_status' => function_exists('basic_auth_config_exists') && basic_auth_config_exists(COMMERCE_ADYEN_NOTIFICATION_URL, TRUE) ? t('basic HTTP authorisation enabled') : t('basic HTTP authorisation disabled'),
+    ]),
+  ];
+
+  $form['basic_auth'] = [
+    '#type' => 'item',
+    '#description' => t('You can restrict an access to the %notification_url URL using <a href="@basic_auth_url" target="_blank">basic HTTP authorisation</a>. We recommend to do this since it help to get rid from dummy messages in system log, when someone decide to visit that URL specially or by accident.', [
+      '@basic_auth_url' => function_exists('basic_auth_config_exists') ? url('admin/config/system/basic-auth', ['absolute' => TRUE]) : url('https://www.drupal.org/project/basic_auth', ['external' => TRUE]),
+      '%notification_url' => $notification_url,
     ]),
   ];
 
@@ -141,30 +142,45 @@ function commerce_adyen_settings_form(array $settings) {
     ],
   ];
 
-  $form['type'] = [
+  $form['state'] = [
     '#type' => 'select',
-    '#title' => t('Payment type'),
-    '#options' => $types,
-    '#empty_option' => t('Default'),
-    '#ajax' => [
-      'callback' => 'commerce_adyen_settings_form_ajax',
-      'wrapper' => __FUNCTION__,
+    '#title' => t('Fields state'),
+    '#default_value' => 0,
+    '#description' => t('State of fields on Adyen HPP.'),
+    '#options' => [
+      t('Fields are visible and modifiable'),
+      t('Fields are visible but unmodifiable'),
+      t('Fields are not visible and unmodifiable'),
     ],
   ];
 
-  if (NULL !== $payment_type) {
-    $payment_type_form = $payment_type->configForm();
+  $form['payment_types'] = [
+    '#type' => 'vertical_tabs',
+  ];
 
-    if (!empty($payment_type_form)) {
-      $form[$settings['type']] = $payment_type_form + [
-        '#tree' => TRUE,
-        '#type' => 'fieldset',
-        '#title' => $payment_types[$settings['type']]['label'],
-      ];
+  foreach ($payment_types as $payment_type => $data) {
+    $config_form = commerce_adyen_invoke_controller('payment', $payment_type, $settings, $payment_types)
+      ->configForm();
+
+    if (!empty($config_form)) {
+      $config_form['#type'] = 'fieldset';
+      $config_form['#title'] = $data['label'];
+
+      $form['payment_types'][$payment_type] = $config_form;
     }
   }
 
+  $form['use_checkout_form'] = [
+    '#type' => 'checkbox',
+    '#title' => t('Use checkout forms'),
+    '#disabled' => empty($config_form),
+    '#description' => t('Allow to use checkout forms for filing additional data for the payment type.'),
+  ];
+
   commerce_adyen_settings_form_process($form, $settings);
+  // If basic HTTP authentication configuration has been changed,
+  // then menu route implementation needs to be rebuilt.
+  variable_set('menu_rebuild_needed', TRUE);
 
   return $form;
 }
@@ -179,35 +195,109 @@ function commerce_adyen_settings_form(array $settings) {
  *
  * @internal
  */
-function commerce_adyen_submit_form(array $payment_method, array $pane_values, array $checkout_pane, \stdClass $order) {
-  $payment_type = commerce_adyen_invoke_controller($payment_method['settings'], NULL, 'checkout');
+function commerce_adyen_submit_form(array $payment_method, array &$pane_values, array $checkout_pane, \stdClass $order) {
+  /* @var \EntityDrupalWrapper $billing_wrapper */
   $form = [];
 
-  if (NULL !== $payment_type) {
-    /* @var \EntityDrupalWrapper $wrapper */
-    $wrapper = entity_metadata_wrapper('commerce_order', $order);
-    $payment_type->setOrder($wrapper);
+  if (!empty($payment_method['settings']['use_checkout_form'])) {
+    $payment_types = commerce_adyen_payment_types();
+    $payment_type = 'standard';
+    $descriptions = [];
+    $options = [];
 
-    // Create fields and attach them to "billing" customer profile.
-    // @todo Maybe we need to move this logic into "hook_modules_enabled"?
-    foreach ($payment_type->checkoutFields() as $field_name => $instance) {
-      $instance['bundle'] = 'billing';
-      $instance['field_name'] = COMMERCE_ADYEN_PAYMENT_METHOD . '_' . $field_name;
-      $instance['entity_type'] = 'commerce_customer_profile';
+    if (!empty($payment_types)) {
+      $options[$payment_type] = t('Regular');
+      $descriptions[$payment_type]['#description'] = t('With this option you can select payment type on Adyen and fill all missing data there.');
 
-      if (empty(field_info_field($instance['field_name']))) {
-        field_create_field($instance);
-      }
+      foreach ($payment_types as $name => $data) {
+        /* @var Payment\Controller\Payment $payment_controller */
+        $payment_controller = $data['controllers']['payment'];
+        $payment_subtypes = $payment_controller::subTypes();
 
-      if (empty(field_info_instance($instance['entity_type'], $instance['field_name'], $instance['bundle']))) {
-        field_create_instance($instance);
+        $options[$name] = $data['label'];
+
+        if (!empty($payment_subtypes)) {
+          $descriptions[$name]['#description'] = implode(', ', $payment_subtypes);
+        }
       }
     }
 
-    $checkout_form = $payment_type->checkoutForm($wrapper->commerce_customer_billing);
+    // Form have already been submitted. Use selected value.
+    if (!empty($pane_values['payment_details']['payment_type'])) {
+      $payment_type = $pane_values['payment_details']['payment_type'];
+    }
+    // In other case we can try to get the chosen payment type from an order.
+    elseif (!empty($order->data['commerce_adyen_payment_type'])) {
+      $payment_type = $order->data['commerce_adyen_payment_type'];
+    }
 
-    if (!empty($checkout_form)) {
-      $form[$payment_method['settings']['type']] = $checkout_form + ['#tree' => TRUE];
+    $form['payment_type'] = $descriptions + [
+      '#type' => 'radios',
+      '#title' => t('Payment type'),
+      '#options' => $options,
+      '#default_value' => $payment_type,
+      '#ajax' => [
+        // @see commerce_payment_pane_checkout_form()
+        'callback' => 'commerce_payment_pane_checkout_form_details_refresh',
+        'wrapper' => 'payment-details',
+      ],
+    ];
+
+    $checkout_controller = commerce_adyen_invoke_controller('checkout', $payment_type, $payment_method['settings'], $payment_types);
+
+    if (NULL !== $checkout_controller) {
+      $checkout_controller->setOrder($order);
+      $checkout_controller->setPaymentMethod($payment_method);
+
+      $order_wrapper = $checkout_controller->getOrder();
+      $billing_wrapper = $order_wrapper->get('commerce_customer_billing');
+
+      $fields_mapping = [];
+      $fields_instances = [];
+
+//      field_delete_field('commerce_adyen_birth_date');
+//      field_delete_instance(field_info_instance('commerce_customer_profile', 'commerce_adyen_birth_date', 'billing'));
+
+      foreach ($checkout_controller->checkoutFields() as $field => $instance) {
+        // By default all checkout fields will be attached to "billing"
+        // customer profile and prefixed with "commerce_adyen_".
+        $instance['bundle'] = 'billing';
+        $instance['field_name'] = COMMERCE_ADYEN_PAYMENT_METHOD . '_' . $field;
+        $instance['entity_type'] = 'commerce_customer_profile';
+
+        if (empty(field_info_field($instance['field_name']))) {
+          field_create_field($instance);
+        }
+
+        if (empty(field_info_instance($instance['entity_type'], $instance['field_name'], $instance['bundle']))) {
+          field_create_instance($instance);
+        }
+
+        $fields_mapping[$instance['field_name']] = $field;
+        $fields_instances[$instance['field_name']] = $instance;
+      }
+
+      // React on checkout fields initialization.
+      module_invoke_all('commerce_adyen_checkout_fields_init', $fields_instances, $order_wrapper, $checkout_controller, $payment_type);
+      // Get checkout form elements.
+      $checkout_form = $checkout_controller->checkoutForm($billing_wrapper);
+
+      if (!empty($checkout_form)) {
+        // Prefill form element properties based on field instance.
+        foreach ($fields_mapping as $drupal_field_name => $form_field_name) {
+          $checkout_form[$form_field_name] += [
+            '#title' => $fields_instances[$drupal_field_name]['label'],
+            '#required' => !empty($fields_instances[$drupal_field_name]['required']),
+            '#default_value' => isset($billing_wrapper->{$drupal_field_name}) ? $billing_wrapper->{$drupal_field_name}->value() : NULL,
+          ];
+        }
+
+        $form[$payment_type] = $checkout_form;
+        $form[$payment_type]['#tree'] = TRUE;
+
+        $form['#checkout_controller'] = $checkout_controller;
+        $form['#checkout_fields_mapping'] = $fields_mapping;
+      }
     }
   }
 
@@ -225,39 +315,51 @@ function commerce_adyen_submit_form(array $payment_method, array $pane_values, a
  * @internal
  */
 function commerce_adyen_submit_form_submit(array $payment_method, array $form, array $values, \stdClass $order, array $balance) {
-  $payment_type = commerce_adyen_invoke_controller($payment_method['settings'], NULL, 'checkout');
+  /* @var \EntityDrupalWrapper $billing_wrapper */
+  $validation_passed = TRUE;
 
-  // We have no checkout controller for this payment type.
-  if (NULL === $payment_type) {
-    return TRUE;
-  }
+  // An instance of checkout controller will be available only if checkout
+  // form is allowed for usage and and contains the elements.
+  if (!empty($form['#checkout_controller'])) {
+    $checkout_controller = $form['#checkout_controller'];
+    $payment_type = $values['payment_type'];
 
-  /* @var \EntityDrupalWrapper $wrapper */
-  $wrapper = entity_metadata_wrapper('commerce_order', $order);
-  // Get values of payment type form.
-  $values = $values[$payment_method['settings']['type']];
-  // Populate order to checkout controller.
-  $payment_type->setOrder($wrapper);
-  // Validate payment type checkout information.
-  $status = $payment_type->checkoutFormValidate($form[$payment_method['settings']['type']], $values, $wrapper->commerce_customer_billing);
+    if ($checkout_controller instanceof Payment\Controller\Checkout) {
+      try {
+        $order_wrapper = $checkout_controller->getOrder();
+        $billing_wrapper = $order_wrapper->get('commerce_customer_billing');
+        $validation_passed = $checkout_controller->checkoutFormValidate($form[$payment_type], $values[$payment_type], $billing_wrapper);
 
-  // Save values into billing profile if validation successfully completed.
-  if ($status) {
-    try {
-      foreach ($payment_type->checkoutFields() as $field_name => $instance) {
-        $wrapper->commerce_customer_billing->{COMMERCE_ADYEN_PAYMENT_METHOD . '_' . $field_name} = isset($values[$field_name]) ? $values[$field_name] : NULL;
+        if ($validation_passed) {
+          // Put the values of defined fields into billing profile.
+          foreach ($form['#checkout_fields_mapping'] as $drupal_field_name => $form_field_name) {
+            $billing_wrapper->{$drupal_field_name} = isset($values[$payment_type][$form_field_name]) ? $values[$payment_type][$form_field_name] : NULL;
+          }
+
+          // React on saving the values of checkout fields.
+          module_invoke_all('commerce_adyen_checkout_fields_save', $values[$payment_type], $order_wrapper, $checkout_controller, $payment_type);
+          // Save billing customer profile used in current order.
+          $billing_wrapper->save();
+        }
+      }
+      catch (\Exception $e) {
+        // Sorry, buddy, but I will output errors on a screen and
+        // put them into log to make sure that you are aware about
+        // bad situation here.
+        watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
+        drupal_set_message($e->getMessage(), 'error');
+        // Do not allow submit payment request in case of any error above.
+        $validation_passed = FALSE;
       }
 
-      $wrapper->commerce_customer_billing->save();
-    }
-    catch (\Exception $e) {
-      watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
-      // Payment request cannot be submitted without these values.
-      return FALSE;
+      // Save payment type into an order to be able to use it in a redirect
+      // form. It will be needed to instantiate payment controller and
+      // extending regular payment by a subtype.
+      $order->data['commerce_adyen_payment_type'] = $payment_type;
     }
   }
 
-  return $status;
+  return $validation_passed;
 }
 
 /**
@@ -275,21 +377,15 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
 
   try {
     $payment = new Payment\Authorisation\Request($order, $payment_method);
-    $payment_type = commerce_adyen_invoke_controller($payment_method['settings']);
 
     if (!empty($payment_method['settings']['recurring'])) {
-      // @todo Shouldn't we use "$payment->getRecurringContractDetails()"
-      // here, choose the reference and set it as "$payment_reference"
-      // argument for "$payment->setRecurringContract()"? Which logic should
-      // be implemented?
       $payment->setRecurringContract($payment_method['settings']['recurring']);
     }
 
-    if (NULL !== $payment_type) {
-      $payment->extend($payment_type);
+    if (!empty($order->data['commerce_adyen_payment_type'])) {
+      $payment->extend(commerce_adyen_invoke_controller('payment', $order->data['commerce_adyen_payment_type'], $payment_method['settings']));
     }
 
-    // @see hook_commerce_adyen_payment_authorisation_request_alter()
     drupal_alter('commerce_adyen_payment_authorisation_request', $payment, $order, $payment_method);
     // Sign the request to verify it later.
     $payment->signRequest();
@@ -339,14 +435,15 @@ function commerce_adyen_redirect_form_validate(\stdClass $order, array $payment_
     switch ($status) {
       case $payment::AUTHORISED:
       case $payment::PENDING:
-        // Allow to authorise|pending the payment on local environments where
+        // Allow to authorise/pending the payment on local environments where
         // notifications are not available. Capturing must be done
         // manually from Adyen backend.
         if (variable_get('commerce_adyen_authorise_forcibly', FALSE)) {
-          $transaction = new Payment\Transaction($order);
-          $transaction->{$payment::PENDING === $status ? 'pending' : 'authorise'}($_GET['pspReference']);
-          $transaction->setPayload($_GET);
+          $transaction = $payment->getTransaction();
+          $transaction->{$payment::PENDING === $status ? 'pending' : 'authorise'}($transaction->getRemoteId());
           $transaction->save();
+
+          commerce_adyen_capture_request($order);
         }
         break;
 
@@ -398,22 +495,6 @@ function commerce_adyen_redirect_form_pre_render(array $form) {
 }
 
 /**
- * AJAX callback.
- *
- * {@inheritdoc}
- *
- * @see commerce_adyen_settings_form()
- * @see ajax_get_form()
- *
- * @internal
- */
-function commerce_adyen_settings_form_ajax(array $form, array &$form_state) {
-  $form_state['rebuild'] = TRUE;
-
-  return $form['parameter']['payment_method']['settings'];
-}
-
-/**
  * Populate values from settings to form items recursively.
  *
  * {@inheritdoc}
@@ -437,31 +518,4 @@ function commerce_adyen_settings_form_process(array &$form, &$settings) {
       // @codingStandardsIgnoreEnd
     }
   }
-}
-
-/**
- * Instantiate payment type class.
- *
- * @param array $settings
- *   Payment method settings.
- * @param array[] $payment_types
- *   List of payment types. Must be result of "commerce_adyen_payment_types()".
- * @param string $controller
- *   One of controller types: "payment" or "checkout".
- *
- * @return Payment\Controller\Payment|Payment\Controller\Checkout|NULL
- *   NULL is payment type class cannot be instantiated.
- *
- * @internal
- */
-function commerce_adyen_invoke_controller(array $settings, array $payment_types = NULL, $controller = 'payment') {
-  if (empty($settings['type'])) {
-    return NULL;
-  }
-
-  if (NULL === $payment_types) {
-    $payment_types = commerce_adyen_payment_types();
-  }
-
-  return new $payment_types[$settings['type']]['controllers'][$controller](isset($settings[$settings['type']]) ? $settings[$settings['type']] : []);
 }

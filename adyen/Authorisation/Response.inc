@@ -58,7 +58,17 @@ class Response extends Signature {
    *   Payment method information.
    */
   public function __construct(\stdClass $order, array $payment_method) {
-    $this->data = drupal_get_query_parameters();
+    $query = [];
+
+    // Using $_GET all dots will be converted to underscores.
+    // @see http://stackoverflow.com/a/68742
+    foreach (explode('&', $_SERVER['QUERY_STRING']) as $pair) {
+      list($name, $value) = explode('=', $pair);
+
+      $query[urldecode($name)] = urldecode($value);
+    }
+
+    $this->data = drupal_get_query_parameters($query);
 
     if (empty($this->data)) {
       throw new \UnexpectedValueException(t('Empty response from Adyen has been received.'));
@@ -74,7 +84,7 @@ class Response extends Signature {
       throw new \UnexpectedValueException(t('Received Adyen response with invalid signature.'));
     }
 
-    $this->transaction = new Transaction($this->order);
+    $this->transaction = new Transaction($order);
     $this->transaction->setPayload($this->data);
     $this->transaction->setRemoteStatus($this->data['authResult']);
 

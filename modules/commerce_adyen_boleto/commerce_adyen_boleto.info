@@ -7,4 +7,3 @@ php = 5.5
 autoload[adyen][] = Commerce\Adyen\Payment\Boleto
 
 dependencies[] = commerce_adyen
-dependencies[] = commerce_adyen_openinvoice

@@ -24,21 +24,19 @@ class Request extends Signature {
    */
   const ENDPOINT_PAY = 'pay';
   /**
-   * Sent the request there to select the payment method.
+   * Send the request there to select the payment method.
    */
   const ENDPOINT_SELECT = 'select';
+  /**
+   * Send the request to edit the payment details.
+   */
+  const ENDPOINT_DETAILS = 'details';
   /**
    * Send the request there together with "brandCode"
    * parameter to skip payment method selection.
    */
   const ENDPOINT_SKIP_DETAILS = 'skipDetails';
 
-  /**
-   * Entity wrapper for "commerce_order".
-   *
-   * @var \EntityDrupalWrapper
-   */
-  protected $orderWrapper;
   /**
    * Request endpoint.
    *
@@ -60,27 +58,32 @@ class Request extends Signature {
     }
 
     parent::__construct($order, $payment_method);
-
-    $this->orderWrapper = entity_metadata_wrapper('commerce_order', $this->order);
+    // Wrapper can be obtained only after it'll be constructed.
+    $order_wrapper = $this->getOrder();
 
     // Payment fields.
     // @link https://docs.adyen.com/developers/hpp-manual#hpppaymentfields
-    $this->setMerchantAccount($this->paymentMethod['settings']['merchant_account']);
-    $this->setMerchantReference($this->order->order_number);
-    $this->setSkinCode($this->paymentMethod['settings']['skin_code']);
+    $this->setMerchantAccount($payment_method['settings']['merchant_account']);
+    $this->setMerchantReference($order->order_number);
+    $this->setSkinCode($payment_method['settings']['skin_code']);
     // Currency code must be set before amount!
-    $this->setCurrencyCode($this->orderWrapper->commerce_order_total->currency_code->value());
-    $this->setPaymentAmount($this->orderWrapper->commerce_order_total->amount->value());
+    $this->setCurrencyCode($order_wrapper->commerce_order_total->currency_code->value());
+    $this->setPaymentAmount($order_wrapper->commerce_order_total->amount->value());
     $this->setSessionValidity(strtotime('+ 2 hour'));
     $this->setShopperIp(ip_address());
-    $this->setShopperEmail($this->order->mail);
+    $this->setShopperEmail($order->mail);
     // The "Anonymous" value will be here in case when order will
     // have "uid" equal to "0".
-    $this->setShopperReference($this->orderWrapper->owner->name->value());
-    $this->setShopperLocale($this->paymentMethod['settings']['shopper_locale']);
+    $this->setShopperReference($order_wrapper->owner->name->value());
+    $this->setShopperLocale($payment_method['settings']['shopper_locale']);
+    $this->setCountryCode($order_wrapper->commerce_customer_billing->commerce_customer_address->country->value());
     $this->setShopperInteraction(Payment\ShopperInteraction::ECOMMERCE);
-    $this->setMerchantReturnData($this->order->data['payment_redirect_key']);
+    $this->setMerchantReturnData($order->data['payment_redirect_key']);
     $this->setEndpoint(self::ENDPOINT_PAY);
+
+    // The default result landing page shoppers are redirected to when
+    // they complete a payment on the HPP. This value cannot be changed!
+    $this->data['resURL'] = url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], ['absolute' => TRUE]);
   }
 
   /**
@@ -120,13 +123,13 @@ class Request extends Signature {
   }
 
   /**
-   * Get brand code of a payment.
+   * Get currency code.
    *
    * @return string
-   *   Brand code of a payment.
+   *   Currency code.
    */
-  public function getBrandCode() {
-    return $this->data['brandCode'];
+  public function getCurrencyCode() {
+    return $this->data['currencyCode'];
   }
 
   /**
@@ -140,13 +143,13 @@ class Request extends Signature {
   }
 
   /**
-   * Get currency code.
+   * Get brand code of a payment.
    *
    * @return string
-   *   Currency code.
+   *   Brand code of a payment.
    */
-  public function getCurrencyCode() {
-    return $this->data['currencyCode'];
+  public function getBrandCode() {
+    return $this->data['brandCode'];
   }
 
   /**
@@ -342,6 +345,28 @@ class Request extends Signature {
   }
 
   /**
+   * Set country code.
+   *
+   * @param string $country_code
+   *   Country code.
+   *
+   * @see https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
+   */
+  public function setCountryCode($country_code) {
+    $this->data['countryCode'] = strtoupper($country_code);
+  }
+
+  /**
+   * Get country code.
+   *
+   * @return string
+   *   Country code.
+   */
+  public function getCountryCode() {
+    return $this->data['countryCode'];
+  }
+
+  /**
    * Set shopper locale.
    *
    * @param string $shopper_locale
@@ -366,7 +391,8 @@ class Request extends Signature {
    * Set recurring contract type.
    *
    * @param string $recurring_contract
-   *   Recurring contract type. Use one constants only.
+   *   Recurring contract type. Use one constants only. Keep in mind
+   *   that PayPal does not allow to use "ONECLICK,RECURRING" type.
    * @param string $payment_reference
    *   PSP reference of a payment or "LATEST" to use latest one.
    *
@@ -395,42 +421,17 @@ class Request extends Signature {
   }
 
   /**
-   * Get recurring contract details.
+   * Set endpoint type.
    *
-   * @return array
-   *   An array of data with recurring details.
+   * @param string $endpoint
+   *   An endpoint type to send the request.
    */
-  public function getRecurringContractDetails() {
-    $recurring = new Recurring($this->getClient($this->paymentMethod));
+  public function setEndpoint($endpoint) {
+    if (!in_array($endpoint, (new \ReflectionClass($this))->getConstants())) {
+      throw new \InvalidArgumentException(t('Endpoint for payment request is incorrect!'));
+    }
 
-    return $recurring->listRecurringDetails([
-      'merchantAccount' => $this->paymentMethod['settings']['merchant_account'],
-      'shopperReference' => $this->getShopperReference(),
-      'recurring' => [
-        'contract' => $this->getRecurringContract(),
-      ],
-    ]);
-  }
-
-  /**
-   * Extend payment authorisation request.
-   *
-   * @param Payment\Controller\Payment $payment
-   *   Object with additional payment data.
-   */
-  public function extend(Payment\Controller\Payment $payment) {
-    $payment->setOrder($this->orderWrapper);
-    $this->data = array_merge($this->data, $payment->getData());
-  }
-
-  /**
-   * Sign payment request.
-   */
-  public function signRequest() {
-    // The default result landing page shoppers are redirected to when
-    // they complete a payment on the HPP.
-    $this->data['resURL'] = url('checkout/' . $this->order->order_id . '/payment/return/' . $this->order->data['payment_redirect_key'], ['absolute' => TRUE]);
-    $this->data['merchantSig'] = $this->getSignature();
+    $this->endpoint = $endpoint;
   }
 
   /**
@@ -442,22 +443,49 @@ class Request extends Signature {
    *   Endpoint URL.
    */
   public function getEndpoint() {
-    return sprintf('https://%s.adyen.com/hpp/%s.shtml', $this->paymentMethod['settings']['mode'], $this->endpoint);
+    return sprintf('https://%s.adyen.com/hpp/%s.shtml', $this->getPaymentMethod()['settings']['mode'], $this->endpoint);
   }
 
   /**
-   * Set endpoint type.
+   * Get recurring contract details.
    *
-   * @param string $endpoint
-   *   An endpoint type to send the request.
-   *
-   * @throws \InvalidArgumentException
+   * @return array
+   *   An array of data with recurring details.
    */
-  public function setEndpoint($endpoint) {
-    if (!in_array($endpoint, [static::ENDPOINT_PAY, static::ENDPOINT_SELECT, static::ENDPOINT_SKIP_DETAILS])) {
-      throw new \InvalidArgumentException(t('Endpoint for payment request is incorrect!'));
-    }
-    $this->endpoint = $endpoint;
+  public function getRecurringContractDetails() {
+    $payment_method = $this->getPaymentMethod();
+    $recurring = new Recurring($this->getClient($payment_method));
+
+    return $recurring->listRecurringDetails([
+      'merchantAccount' => $payment_method['settings']['merchant_account'],
+      'shopperReference' => $this->getShopperReference(),
+      'recurring' => [
+        'contract' => $this->getRecurringContract(),
+      ],
+    ]);
+  }
+
+  /**
+   * Extend payment authorisation request.
+   *
+   * @param Payment\Controller\Payment $controller
+   *   Object with additional payment data.
+   */
+  public function extend(Payment\Controller\Payment $controller) {
+    $controller->setPayment($this);
+    // This value MUST be saved into a variable, because payment controller
+    // can modify values in "$this->data" and they are will not be available
+    // for merging in case of passing the result directly as an argument.
+    $controller_data = $controller->getData();
+
+    $this->data = array_merge($this->data, $controller_data);
+  }
+
+  /**
+   * Sign payment request.
+   */
+  public function signRequest() {
+    $this->data['merchantSig'] = $this->getSignature();
   }
 
 }

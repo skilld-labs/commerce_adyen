@@ -61,6 +61,12 @@ class Shopper {
    * @var string
    */
   private $dateOfBirthDayOfMonth = '';
+  /**
+   * Shopper social security number.
+   *
+   * @var string
+   */
+  private $socialSecurityNumber = '';
 
   /**
    * {@inheritdoc}
@@ -172,6 +178,20 @@ class Shopper {
    */
   public function setDateOfBirthDayOfMonth($date_of_birth_day_of_month) {
     $this->dateOfBirthDayOfMonth = $date_of_birth_day_of_month;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setSocialSecurityNumber($social_security_number) {
+    $this->socialSecurityNumber = $social_security_number;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getSocialSecurityNumber() {
+    return $this->socialSecurityNumber;
   }
 
 }

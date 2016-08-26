@@ -7,6 +7,7 @@
 namespace Commerce\Adyen\Payment\Authorisation;
 
 use Adyen\Util\Util;
+use Commerce\Adyen\Payment\Facade;
 
 /**
  * Class Signature.
@@ -15,18 +16,12 @@ use Adyen\Util\Util;
  */
 abstract class Signature implements \Iterator {
 
+  use Facade;
+
   /**
    * @var array
    */
   protected $data = [];
-  /**
-   * @var \stdClass
-   */
-  protected $order;
-  /**
-   * @var array
-   */
-  protected $paymentMethod = [];
 
   /**
    * Signature constructor.
@@ -37,8 +32,8 @@ abstract class Signature implements \Iterator {
    *   Payment method information.
    */
   public function __construct(\stdClass $order, array $payment_method) {
-    $this->order = $order;
-    $this->paymentMethod = $payment_method;
+    $this->setOrder($order);
+    $this->setPaymentMethod($payment_method);
   }
 
   /**
@@ -53,7 +48,7 @@ abstract class Signature implements \Iterator {
     // The "merchantSig" never must not take part in signature calculation.
     unset($data['merchantSig']);
 
-    return Util::calculateSha256Signature($this->paymentMethod['settings']['hmac'], $data);
+    return Util::calculateSha256Signature($this->getPaymentMethod()['settings']['hmac'], $data);
   }
 
   /**
