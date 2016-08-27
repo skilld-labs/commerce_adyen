@@ -20,6 +20,7 @@ function commerce_adyen_settings_form(array $settings) {
   $notification_url = url(COMMERCE_ADYEN_NOTIFICATION_URL, ['absolute' => TRUE]);
   $payment_types = commerce_adyen_payment_types();
   $backend_link = sprintf('https://ca-%s.adyen.com/ca/ca', isset($settings['mode']) ? $settings['mode'] : \Adyen\Environment::TEST);
+  $types = [];
   $form = [];
 
   $link = function ($title, $link) use ($backend_link) {
@@ -133,7 +134,7 @@ function commerce_adyen_settings_form(array $settings) {
 
   $form['recurring'] = [
     '#type' => 'select',
-    '#title' => t('Recurring payments'),
+    '#title' => t('Recurring contract'),
     '#empty_option' => t('Do not used'),
     '#options' => [
       \Adyen\Contract::ONECLICK => t('One click'),
@@ -168,7 +169,19 @@ function commerce_adyen_settings_form(array $settings) {
 
       $form['payment_types'][$payment_type] = $config_form;
     }
+
+    // Form a list of payment types and their labels.
+    $types[$payment_type] = $data['label'];
   }
+
+  $form['default_payment_type'] = [
+    '#type' => 'select',
+    '#title' => t('Default payment type'),
+    '#options' => $types,
+    '#disabled' => empty($types),
+    '#description' => t('Selected payment type will be set as default extender for the payment request. This value can be changed during checkout process.'),
+    '#empty_option' => t('- None -'),
+  ];
 
   $form['use_checkout_form'] = [
     '#type' => 'checkbox',
@@ -178,9 +191,6 @@ function commerce_adyen_settings_form(array $settings) {
   ];
 
   commerce_adyen_settings_form_process($form, $settings);
-  // If basic HTTP authentication configuration has been changed,
-  // then menu route implementation needs to be rebuilt.
-  variable_set('menu_rebuild_needed', TRUE);
 
   return $form;
 }
@@ -232,11 +242,19 @@ function commerce_adyen_submit_form(array $payment_method, array &$pane_values, 
       $payment_type = $order->data['commerce_adyen_payment_type'];
     }
 
+    // Existing orders can have payment type selected. If this type will
+    // be disabled, while an order be in active state, then fatal error
+    // will be appeared on redirection to Adyen HPP. But we are not stupid,
+    // we are double-check subtype for existence.
+    if (empty($payment_types[$payment_type])) {
+      $payment_type = '';
+    }
+
     $form['payment_type'] = $descriptions + [
       '#type' => 'radios',
       '#title' => t('Type'),
       '#options' => $options,
-      '#default_value' => $payment_type,
+      '#default_value' => $payment_type ?: $payment_method['settings']['default_payment_type'],
       '#ajax' => [
         // @see commerce_payment_pane_checkout_form()
         'callback' => 'commerce_payment_pane_checkout_form_details_refresh',
@@ -281,15 +299,10 @@ function commerce_adyen_submit_form_submit(array $payment_method, array $form, a
 
   // An instance of checkout controller will be available
   // only if payment subtype has been selected.
-  if (!empty($form['#checkout_controller']) && !empty($values['payment_type'])) {
-    $checkout_controller = $form['#checkout_controller'];
+  if (!empty($values['payment_type'])) {
     $payment_type = $values['payment_type'];
     // Simulate empty list of values from checkout form.
     $values += [$payment_type => []];
-
-    if (!empty($form[$payment_type]) && !empty($values[$payment_type]) && $checkout_controller instanceof Payment\Controller\Checkout) {
-      $checkout_controller->checkoutFormValidate($form[$payment_type], $values[$payment_type]);
-    }
 
     // Save payment type into an order to be able to use it in a redirect
     // form. It will be needed to instantiate payment controller and
@@ -297,6 +310,14 @@ function commerce_adyen_submit_form_submit(array $payment_method, array $form, a
     $order->data['commerce_adyen_payment_type'] = $payment_type;
     // Store values for the payment type from checkout form.
     $order->data[$payment_type] = $values[$payment_type];
+
+    if (!empty($form['#checkout_controller']) && !empty($form[$payment_type]) && !empty($values[$payment_type])) {
+      $checkout_controller = $form['#checkout_controller'];
+
+      if ($checkout_controller instanceof Payment\Controller\Checkout) {
+        $checkout_controller->checkoutFormValidate($form[$payment_type], $values[$payment_type]);
+      }
+    }
   }
 
   return $validation_passed;

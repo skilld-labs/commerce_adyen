@@ -121,6 +121,7 @@ abstract class Payment extends Controller {
   protected function addShopperInformation(Shopper $shopper, \EntityDrupalWrapper $billing) {
     $address = $billing->commerce_customer_address->value();
     $state = $this->payment->getPaymentMethod()['settings']['state'];
+    $order = $this->payment->getOrder();
 
     if (!empty($state)) {
       $this->set('shopperType', $state);
@@ -155,7 +156,7 @@ abstract class Payment extends Controller {
     }
 
     // Allow other modules alter the address.
-    drupal_alter('commerce_adyen_shopper_information', $shopper, $billing, $this->checkoutValues, $this->payment->getOrder());
+    drupal_alter('commerce_adyen_shopper_information', $shopper, $billing, $this->checkoutValues, $order);
 
     $this->validateShopperInformation($shopper);
     $this->set('shopper.infix', $shopper->getInfix());
@@ -189,6 +190,7 @@ abstract class Payment extends Controller {
    */
   protected function addAddress(Address $address, \EntityDrupalWrapper $profile) {
     $state = $this->payment->getPaymentMethod()['settings']['state'];
+    $order = $this->payment->getOrder();
     $type = $address->getType() . 'Address';
 
     if (!empty($state)) {
@@ -223,7 +225,7 @@ abstract class Payment extends Controller {
     }
 
     // Allow other modules alter the address.
-    drupal_alter('commerce_adyen_shopper_address', $address, $profile, $this->checkoutValues, $this->payment->getOrder());
+    drupal_alter('commerce_adyen_shopper_address', $address, $profile, $this->checkoutValues, $order);
 
     $this->validateAddress($address);
     $this->set("$type.city", $address->getCity());
