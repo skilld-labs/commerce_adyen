@@ -29,6 +29,14 @@ abstract class Payment extends Controller {
    * @var Request
    */
   protected $payment;
+  /**
+   * Values form the form of checkout controller.
+   *
+   * @see Checkout::checkoutForm()
+   *
+   * @var array
+   */
+  protected $checkoutValues = [];
 
   /**
    * Build the data.
@@ -43,6 +51,16 @@ abstract class Payment extends Controller {
    */
   public function setPayment(Request $payment) {
     $this->payment = $payment;
+  }
+
+  /**
+   * Set values form the form of checkout controller.
+   *
+   * @param array $checkout_values
+   *   Values form the form of checkout controller.
+   */
+  public function setCheckoutValues(array $checkout_values) {
+    $this->checkoutValues = $checkout_values;
   }
 
   /**
@@ -78,20 +96,7 @@ abstract class Payment extends Controller {
    *   Form items.
    */
   public function configForm() {
-    $subtypes = static::subTypes();
-    $form = [];
-
-    if (!empty($subtypes)) {
-      $form['type'] = [
-        '#type' => 'select',
-        '#title' => t('Type'),
-        '#options' => $subtypes,
-        '#description' => t('Select subtype of payment. You can leave it empty and select afterwards on Adyen HPP.'),
-        '#empty_option' => t('- None -'),
-      ];
-    }
-
-    return $form;
+    return [];
   }
 
   /**
@@ -121,29 +126,6 @@ abstract class Payment extends Controller {
       $this->set('shopperType', $state);
     }
 
-    // Add shopper gender if field exists.
-    if (isset($billing->commerce_adyen_gender)) {
-      $shopper->setGender($billing->commerce_adyen_gender->value());
-    }
-
-    // Add shopper phone number if field exists.
-    if (isset($billing->commerce_adyen_phone_number)) {
-      $shopper->setTelephoneNumber($billing->commerce_adyen_phone_number->value());
-    }
-
-    // Add shopper birth date if field exists.
-    if (isset($billing->commerce_adyen_birth_date)) {
-      $birth = $billing->commerce_adyen_birth_date->value();
-
-      $shopper->setDateOfBirthYear(date('Y', $birth));
-      $shopper->setDateOfBirthMonth(date('m', $birth));
-      $shopper->setDateOfBirthDayOfMonth(date('d', $birth));
-    }
-
-    if (isset($billing->commerce_adyen_social_number)) {
-      $shopper->setSocialSecurityNumber($billing->commerce_adyen_social_number->value());
-    }
-
     if (isset($address['first_name'])) {
       $shopper->setFirstName($address['first_name']);
     }
@@ -152,8 +134,28 @@ abstract class Payment extends Controller {
       $shopper->setLastName($address['last_name']);
     }
 
+    if (!empty($this->checkoutValues['gender'])) {
+      $shopper->setGender($this->checkoutValues['gender']);
+    }
+
+    if (!empty($this->checkoutValues['phone_number'])) {
+      $shopper->setTelephoneNumber($this->checkoutValues['phone_number']);
+    }
+
+    if (!empty($this->checkoutValues['social_number'])) {
+      $shopper->setTelephoneNumber($this->checkoutValues['social_number']);
+    }
+
+    if (!empty($this->checkoutValues['birth_date'])) {
+      $birth_date = strtotime($this->checkoutValues['birth_date']);
+
+      $shopper->setDateOfBirthYear(date('Y', $birth_date));
+      $shopper->setDateOfBirthMonth(date('m', $birth_date));
+      $shopper->setDateOfBirthDayOfMonth(date('d', $birth_date));
+    }
+
     // Allow other modules alter the address.
-    drupal_alter('commerce_adyen_shopper_information', $shopper, $this->payment->getOrder(), $billing);
+    drupal_alter('commerce_adyen_shopper_information', $shopper, $billing, $this->checkoutValues, $this->payment->getOrder());
 
     $this->validateShopperInformation($shopper);
     $this->set('shopper.infix', $shopper->getInfix());
@@ -221,7 +223,7 @@ abstract class Payment extends Controller {
     }
 
     // Allow other modules alter the address.
-    drupal_alter('commerce_adyen_shopper_address', $address, $this->payment->getOrder(), $profile);
+    drupal_alter('commerce_adyen_shopper_address', $address, $profile, $this->checkoutValues, $this->payment->getOrder());
 
     $this->validateAddress($address);
     $this->set("$type.city", $address->getCity());

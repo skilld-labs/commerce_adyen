@@ -19,27 +19,12 @@ class CheckoutController extends Checkout {
   /**
    * {@inheritdoc}
    */
-  public function checkoutFields() {
-    $fields = [];
-
-    $fields['social_number'] = [
-      'type' => 'text',
-      'label' => t('Social security number'),
-      'cardinality' => 1,
-      'translatable' => FALSE,
-    ];
-
-    return $fields;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function checkoutForm(\EntityDrupalWrapper $billing) {
+  public function checkoutForm() {
     $form = [];
 
     $form['social_number'] = [
       '#type' => 'textfield',
+      '#title' => t('Social security number'),
     ];
 
     return $form;
@@ -48,7 +33,7 @@ class CheckoutController extends Checkout {
   /**
    * {@inheritdoc}
    */
-  public function checkoutFormValidate(array $form, array &$values, \EntityDrupalWrapper $billing) {
+  public function checkoutFormValidate(array $form, array &$values) {
     if (!empty($values['social_number'])) {
       $helper = new BrazilianHelper();
 
@@ -80,6 +65,6 @@ class CheckoutController extends Checkout {
       }
     }
 
-    return parent::checkoutFormValidate($form, $values, $billing);
+    return TRUE;
   }
 }

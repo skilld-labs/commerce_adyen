@@ -42,12 +42,8 @@ class PaymentController extends Payment {
    */
   protected function build() {
     $order = $this->payment->getOrder();
-
-    if (!empty($this->config['type'])) {
-      // @see https://github.com/Adyen/adyen-magento2/blob/46c6758b3fc472a52a0bf5a7dd2fbf184bfcd970/Helper/Data.php#L651-L671
-      $this->payment->setBrandCode('boletobancario_' . $this->config['type']);
-    }
-
+    // @see https://github.com/Adyen/adyen-magento2/blob/46c6758b3fc472a52a0bf5a7dd2fbf184bfcd970/Helper/Data.php#L651-L671
+    // $this->payment->setBrandCode('boletobancario_<TYPE>');
     $this->addShopperInformation(new Shopper(), $order->commerce_customer_billing);
     $this->addAddress(new Address(Address::BILLING), $order->commerce_customer_billing);
   }

@@ -96,7 +96,7 @@ function commerce_adyen_payment_types() {
 
   $add_payment_type = function ($name, array $payment_type) use (&$payment_types) {
     try {
-      if (!isset($payment_type['label'])) {
+      if (empty($payment_type['label'])) {
         throw new \InvalidArgumentException(t('Adyen payment type definition must have a label.'));
       }
 
@@ -119,6 +119,7 @@ function commerce_adyen_payment_types() {
       $payment_types[$name] = $payment_type;
     }
     catch (\InvalidArgumentException $e) {
+      unset($payment_types[$name]);
       watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
     }
   };

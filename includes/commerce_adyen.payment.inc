@@ -173,7 +173,7 @@ function commerce_adyen_settings_form(array $settings) {
   $form['use_checkout_form'] = [
     '#type' => 'checkbox',
     '#title' => t('Use checkout forms'),
-    '#disabled' => empty($config_form),
+    '#disabled' => empty($payment_types),
     '#description' => t('Allow to use checkout forms for filing additional data for the payment type.'),
   ];
 
@@ -196,30 +196,31 @@ function commerce_adyen_settings_form(array $settings) {
  * @internal
  */
 function commerce_adyen_submit_form(array $payment_method, array &$pane_values, array $checkout_pane, \stdClass $order) {
-  /* @var \EntityDrupalWrapper $billing_wrapper */
+  $payment_types = commerce_adyen_payment_types();
   $form = [];
 
-  if (!empty($payment_method['settings']['use_checkout_form'])) {
-    $payment_types = commerce_adyen_payment_types();
-    $payment_type = 'standard';
-    $descriptions = [];
-    $options = [];
+  if (!empty($payment_types)) {
+    // This is a dummy type.
+    $payment_type = '';
 
-    if (!empty($payment_types)) {
-      $options[$payment_type] = t('Regular');
-      $descriptions[$payment_type]['#description'] = t('With this option you can select payment type on Adyen and fill all missing data there.');
+    // Add a "default" option to be able back to standard payment.
+    $options = [
+      $payment_type => t('Regular'),
+    ];
 
-      foreach ($payment_types as $name => $data) {
-        /* @var Payment\Controller\Payment $payment_controller */
-        $payment_controller = $data['controllers']['payment'];
-        $payment_subtypes = $payment_controller::subTypes();
+    // Describe a standard payment type a little.
+    $descriptions = [
+      $payment_type => [
+        '#description' => t('Extra data, required by other payment methods, will not be sent'),
+      ],
+    ];
 
-        $options[$name] = $data['label'];
+    foreach ($payment_types as $name => $data) {
+      /* @var Payment\Controller\Payment $payment_controller */
+      $payment_controller = $data['controllers']['payment'];
 
-        if (!empty($payment_subtypes)) {
-          $descriptions[$name]['#description'] = implode(', ', $payment_subtypes);
-        }
-      }
+      $options[$name] = $data['label'];
+      $descriptions[$name]['#description'] = implode(', ', $payment_controller::subTypes());
     }
 
     // Form have already been submitted. Use selected value.
@@ -233,7 +234,7 @@ function commerce_adyen_submit_form(array $payment_method, array &$pane_values, 
 
     $form['payment_type'] = $descriptions + [
       '#type' => 'radios',
-      '#title' => t('Payment type'),
+      '#title' => t('Type'),
       '#options' => $options,
       '#default_value' => $payment_type,
       '#ajax' => [
@@ -249,55 +250,16 @@ function commerce_adyen_submit_form(array $payment_method, array &$pane_values, 
       $checkout_controller->setOrder($order);
       $checkout_controller->setPaymentMethod($payment_method);
 
-      $order_wrapper = $checkout_controller->getOrder();
-      $billing_wrapper = $order_wrapper->get('commerce_customer_billing');
+      if (!empty($payment_method['settings']['use_checkout_form'])) {
+        $checkout_form = $checkout_controller->checkoutForm();
 
-      $fields_mapping = [];
-      $fields_instances = [];
-
-//      field_delete_field('commerce_adyen_birth_date');
-//      field_delete_instance(field_info_instance('commerce_customer_profile', 'commerce_adyen_birth_date', 'billing'));
-
-      foreach ($checkout_controller->checkoutFields() as $field => $instance) {
-        // By default all checkout fields will be attached to "billing"
-        // customer profile and prefixed with "commerce_adyen_".
-        $instance['bundle'] = 'billing';
-        $instance['field_name'] = COMMERCE_ADYEN_PAYMENT_METHOD . '_' . $field;
-        $instance['entity_type'] = 'commerce_customer_profile';
-
-        if (empty(field_info_field($instance['field_name']))) {
-          field_create_field($instance);
+        if (!empty($checkout_form)) {
+          $form[$payment_type] = $checkout_form;
+          $form[$payment_type]['#tree'] = TRUE;
         }
-
-        if (empty(field_info_instance($instance['entity_type'], $instance['field_name'], $instance['bundle']))) {
-          field_create_instance($instance);
-        }
-
-        $fields_mapping[$instance['field_name']] = $field;
-        $fields_instances[$instance['field_name']] = $instance;
       }
 
-      // React on checkout fields initialization.
-      module_invoke_all('commerce_adyen_checkout_fields_init', $fields_instances, $order_wrapper, $checkout_controller, $payment_type);
-      // Get checkout form elements.
-      $checkout_form = $checkout_controller->checkoutForm($billing_wrapper);
-
-      if (!empty($checkout_form)) {
-        // Prefill form element properties based on field instance.
-        foreach ($fields_mapping as $drupal_field_name => $form_field_name) {
-          $checkout_form[$form_field_name] += [
-            '#title' => $fields_instances[$drupal_field_name]['label'],
-            '#required' => !empty($fields_instances[$drupal_field_name]['required']),
-            '#default_value' => isset($billing_wrapper->{$drupal_field_name}) ? $billing_wrapper->{$drupal_field_name}->value() : NULL,
-          ];
-        }
-
-        $form[$payment_type] = $checkout_form;
-        $form[$payment_type]['#tree'] = TRUE;
-
-        $form['#checkout_controller'] = $checkout_controller;
-        $form['#checkout_fields_mapping'] = $fields_mapping;
-      }
+      $form['#checkout_controller'] = $checkout_controller;
     }
   }
 
@@ -315,48 +277,26 @@ function commerce_adyen_submit_form(array $payment_method, array &$pane_values, 
  * @internal
  */
 function commerce_adyen_submit_form_submit(array $payment_method, array $form, array $values, \stdClass $order, array $balance) {
-  /* @var \EntityDrupalWrapper $billing_wrapper */
   $validation_passed = TRUE;
 
-  // An instance of checkout controller will be available only if checkout
-  // form is allowed for usage and and contains the elements.
-  if (!empty($form['#checkout_controller'])) {
+  // An instance of checkout controller will be available
+  // only if payment subtype has been selected.
+  if (!empty($form['#checkout_controller']) && !empty($values['payment_type'])) {
     $checkout_controller = $form['#checkout_controller'];
     $payment_type = $values['payment_type'];
+    // Simulate empty list of values from checkout form.
+    $values += [$payment_type => []];
 
-    if ($checkout_controller instanceof Payment\Controller\Checkout) {
-      try {
-        $order_wrapper = $checkout_controller->getOrder();
-        $billing_wrapper = $order_wrapper->get('commerce_customer_billing');
-        $validation_passed = $checkout_controller->checkoutFormValidate($form[$payment_type], $values[$payment_type], $billing_wrapper);
-
-        if ($validation_passed) {
-          // Put the values of defined fields into billing profile.
-          foreach ($form['#checkout_fields_mapping'] as $drupal_field_name => $form_field_name) {
-            $billing_wrapper->{$drupal_field_name} = isset($values[$payment_type][$form_field_name]) ? $values[$payment_type][$form_field_name] : NULL;
-          }
-
-          // React on saving the values of checkout fields.
-          module_invoke_all('commerce_adyen_checkout_fields_save', $values[$payment_type], $order_wrapper, $checkout_controller, $payment_type);
-          // Save billing customer profile used in current order.
-          $billing_wrapper->save();
-        }
-      }
-      catch (\Exception $e) {
-        // Sorry, buddy, but I will output errors on a screen and
-        // put them into log to make sure that you are aware about
-        // bad situation here.
-        watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
-        drupal_set_message($e->getMessage(), 'error');
-        // Do not allow submit payment request in case of any error above.
-        $validation_passed = FALSE;
-      }
-
-      // Save payment type into an order to be able to use it in a redirect
-      // form. It will be needed to instantiate payment controller and
-      // extending regular payment by a subtype.
-      $order->data['commerce_adyen_payment_type'] = $payment_type;
+    if (!empty($form[$payment_type]) && !empty($values[$payment_type]) && $checkout_controller instanceof Payment\Controller\Checkout) {
+      $checkout_controller->checkoutFormValidate($form[$payment_type], $values[$payment_type]);
     }
+
+    // Save payment type into an order to be able to use it in a redirect
+    // form. It will be needed to instantiate payment controller and
+    // extending regular payment by a subtype.
+    $order->data['commerce_adyen_payment_type'] = $payment_type;
+    // Store values for the payment type from checkout form.
+    $order->data[$payment_type] = $values[$payment_type];
   }
 
   return $validation_passed;
@@ -383,7 +323,9 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
     }
 
     if (!empty($order->data['commerce_adyen_payment_type'])) {
-      $payment->extend(commerce_adyen_invoke_controller('payment', $order->data['commerce_adyen_payment_type'], $payment_method['settings']));
+      $payment_controller = commerce_adyen_invoke_controller('payment', $order->data['commerce_adyen_payment_type'], $payment_method['settings']);
+      $payment_controller->setCheckoutValues($order->data[$order->data['commerce_adyen_payment_type']]);
+      $payment->extend($payment_controller);
     }
 
     drupal_alter('commerce_adyen_payment_authorisation_request', $payment, $order, $payment_method);
