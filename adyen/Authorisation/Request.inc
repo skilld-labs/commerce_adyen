@@ -72,9 +72,14 @@ class Request extends Signature {
     $this->setSessionValidity(strtotime('+ 2 hour'));
     $this->setShopperIp(ip_address());
     $this->setShopperEmail($order->mail);
-    // The "Anonymous" value will be here in case when order will
-    // have "uid" equal to "0".
-    $this->setShopperReference($order_wrapper->owner->name->value());
+    // For "Anonymous" users we need to pass email as shopper reference, it was
+    // flagged by the Adyen. Otherwise, we can get large fraud score.
+    if (!(bool) $order->uid) {
+      $this->setShopperReference($order->mail);
+    }
+    else {
+      $this->setShopperReference($order_wrapper->owner->name->value());
+    }
     $this->setShopperLocale($payment_method['settings']['shopper_locale']);
     $this->setCountryCode($order_wrapper->commerce_customer_billing->commerce_customer_address->country->value());
     $this->setShopperInteraction(Payment\ShopperInteraction::ECOMMERCE);
