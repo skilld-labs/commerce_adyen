@@ -148,6 +148,16 @@ class Request extends Signature {
   }
 
   /**
+   * Set allowed payment methods.
+   *
+   * @param string $payment_methods
+   *   A comma-separated list of the allowed payment methods.
+   */
+  public function setAllowedMethods($payment_methods) {
+    $this->data['allowedMethods'] = $payment_methods;
+  }
+
+  /**
    * Get brand code of a payment.
    *
    * @return string
