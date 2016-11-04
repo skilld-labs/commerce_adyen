@@ -74,6 +74,7 @@ class PaymentController extends Payment {
       $vat_amount = commerce_adyen_amount(commerce_vat_total_amount($line_item_total['data']['components'], TRUE, $currency_code), $currency_code);
       $label = isset($line_item->commerce_product) ? $line_item->commerce_product->title : $line_item->line_item_label;
       $item++;
+      $percentage = ($line_item_total['amount'] / ($line_item_total['amount'] - $vat_amount) - 1) * 100;
 
       foreach ([
         'itemAmount' => commerce_adyen_amount($line_item->commerce_unit_price->amount->value(), $currency_code),
@@ -86,7 +87,7 @@ class PaymentController extends Payment {
         // Value must be represented in minor units. E.g. "3 Euro" is "300".
         'itemVatAmount' => $vat_amount,
         // Value must be represented in minor units. E.g. "7%" is "700".
-        'itemVatPercentage' => $vat_amount > 0 ? commerce_round(COMMERCE_ROUND_HALF_UP, $line_item_total['amount'] * 100 / $vat_amount) : 0,
+        'itemVatPercentage' => commerce_round(COMMERCE_ROUND_HALF_UP, $percentage) * 100,
       ] as $field => $value) {
         $this->set("openinvoicedata.line$item.$field", $value);
       }
