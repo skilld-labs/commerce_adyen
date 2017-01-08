@@ -1,19 +1,13 @@
 <?php
-/**
- * @file
- * Commerce Adyen Payment Transaction.
- */
 
 namespace Commerce\Adyen\Payment;
 
-use Commerce\Utils;
+use Commerce\Utils\Transaction as TransactionBase;
 
 /**
- * Class Transaction.
- *
- * @package Commerce\Adyen\Payment
+ * Adyen payment transaction.
  */
-class Transaction extends Utils\Transaction {
+class Transaction extends TransactionBase {
 
   /**
    * {@inheritdoc}

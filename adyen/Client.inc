@@ -1,15 +1,11 @@
 <?php
-/**
- * @file
- * Adyen client.
- */
 
 namespace Commerce\Adyen\Payment;
 
+use Adyen\Client as AdyenClient;
+
 /**
- * Trait Client.
- *
- * @package Commerce\Adyen\Payment
+ * Adyen client.
  */
 trait Client {
 
@@ -19,11 +15,11 @@ trait Client {
    * @param array $payment_method
    *   Payment method instance.
    *
-   * @return \Adyen\Client
+   * @return AdyenClient
    *   Client object.
    */
   protected function getClient(array $payment_method) {
-    $client = new \Adyen\Client();
+    $client = new AdyenClient();
     $client->setUsername($payment_method['settings']['client_user']);
     $client->setPassword($payment_method['settings']['client_password']);
     $client->setEnvironment($payment_method['settings']['mode']);

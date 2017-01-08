@@ -1,15 +1,9 @@
 <?php
-/**
- * @file
- * Shopper information for OpenInvoice payment.
- */
 
 namespace Commerce\Adyen\Payment\Composition;
 
 /**
- * Class Shopper.
- *
- * @package Commerce\Adyen\Payment\Composition
+ * Shopper information for OpenInvoice payment.
  */
 class Shopper {
 

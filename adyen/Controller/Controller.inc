@@ -1,25 +1,18 @@
 <?php
-/**
- * @file
- * Base controller.
- */
 
 namespace Commerce\Adyen\Payment\Controller;
 
 /**
- * Class Controller.
- *
- * @package Commerce\Adyen\Payment\Controller
+ * Base controller.
  */
 abstract class Controller {
 
   /**
-   * Configuration of payment type. Here be the values
-   * from "configFrom" method of payment controller.
-   *
-   * @see \Commerce\Adyen\Payment\Controller\Payment::configForm()
+   * Configuration of payment type. The values from "configFrom" method.
    *
    * @var array
+   *
+   * @see \Commerce\Adyen\Payment\Controller\Payment::configForm()
    */
   protected $config = [];
 

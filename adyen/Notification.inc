@@ -1,19 +1,13 @@
 <?php
-/**
- * @file
- * Notification Interface.
- */
 
 namespace Commerce\Adyen\Payment;
 
 /**
- * Class Notification.
+ * Notification events.
  *
- * @package Commerce\Adyen\Payment
+ * @link https://github.com/Adyen/php/blob/master/3.Notifications/httppost/notification-server.php
  */
 abstract class Notification {
-
-  // @see https://github.com/Adyen/php/blob/master/3.Notifications/httppost/notification-server.php
 
   const AUTHORISATION = 'AUTHORISATION';
   const CANCELLATION = 'CANCELLATION';

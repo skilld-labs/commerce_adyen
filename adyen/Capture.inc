@@ -1,18 +1,11 @@
 <?php
-/**
- * @file
- * Capture request.
- */
 
 namespace Commerce\Adyen\Payment;
 
-use Adyen\Service;
-use Adyen\AdyenException;
+use Adyen\Service\Modification;
 
 /**
- * Class Capture
- *
- * @package Commerce\Adyen\Payment
+ * Capture request.
  */
 class Capture {
 
@@ -48,7 +41,7 @@ class Capture {
   /**
    * Send a capture request.
    *
-   * @throws AdyenException
+   * @throws \Adyen\AdyenException
    *   When capture request is not valid.
    */
   public function request() {
@@ -58,7 +51,7 @@ class Capture {
 
     // Make an API call to tell Adyen that we are waiting for notification
     // from it.
-    $capture = (new Service\Modification($this->getClient($payment_method)))->capture([
+    $capture = (new Modification($this->getClient($payment_method)))->capture([
       'reference' => $order->order_number,
       'merchantAccount' => $payment_method['settings']['merchant_account'],
       'originalReference' => $this->transaction->getRemoteId(),

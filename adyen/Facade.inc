@@ -1,15 +1,9 @@
 <?php
-/**
- * @file
- * Abstraction for storing an order and payment method in the object.
- */
 
 namespace Commerce\Adyen\Payment;
 
 /**
- * Trait Facade.
- *
- * @package Commerce\Adyen\Payment
+ * Abstraction for storing an order and payment method in the object.
  */
 trait Facade {
 

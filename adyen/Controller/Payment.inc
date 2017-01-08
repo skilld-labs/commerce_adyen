@@ -1,8 +1,4 @@
 <?php
-/**
- * @file
- * Base payment controller.
- */
 
 namespace Commerce\Adyen\Payment\Controller;
 
@@ -11,9 +7,7 @@ use Commerce\Adyen\Payment\Composition\Address;
 use Commerce\Adyen\Payment\Composition\Shopper;
 
 /**
- * Class Payment.
- *
- * @package Commerce\Adyen\Payment\Controller
+ * Base payment controller.
  */
 abstract class Payment extends Controller {
 
@@ -32,9 +26,9 @@ abstract class Payment extends Controller {
   /**
    * Values form the form of checkout controller.
    *
-   * @see Checkout::checkoutForm()
-   *
    * @var array
+   *
+   * @see Checkout::checkoutForm()
    */
   protected $checkoutValues = [];
 

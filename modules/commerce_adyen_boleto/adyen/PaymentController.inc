@@ -1,8 +1,4 @@
 <?php
-/**
- * @file
- * Boleto payment controller.
- */
 
 namespace Commerce\Adyen\Payment\Boleto;
 
@@ -11,9 +7,7 @@ use Commerce\Adyen\Payment\Composition\Address;
 use Commerce\Adyen\Payment\Composition\Shopper;
 
 /**
- * Class PaymentController.
- *
- * @package Commerce\Adyen\Payment\Boleto
+ * Boleto payment controller.
  */
 class PaymentController extends Payment {
 

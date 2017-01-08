@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Commerce Adyen API.
@@ -97,8 +98,6 @@ function hook_commerce_adyen_capture_rejected(\Commerce\Adyen\Payment\Transactio
 /**
  * React on a notification from Adyen.
  *
- * @link https://docs.adyen.com/developers/api-manual#notificationfields
- *
  * @param string $event_code
  *   One of event codes in a lowercase.
  * @param \stdClass $order
@@ -106,6 +105,7 @@ function hook_commerce_adyen_capture_rejected(\Commerce\Adyen\Payment\Transactio
  * @param \stdClass $data
  *   Received data (from $_REQEUST superglobal).
  *
+ * @link https://docs.adyen.com/developers/api-manual#notificationfields
  * @see commerce_adyen_notification()
  */
 function hook_commerce_adyen_notification($event_code, \stdClass $order, \stdClass $data) {

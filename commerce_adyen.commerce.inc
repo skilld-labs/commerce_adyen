@@ -1,10 +1,12 @@
 <?php
+
 /**
  * @file
  * Commerce integration.
  */
 
-use Commerce\Adyen\Payment;
+use Commerce\Adyen\Payment\Transaction;
+use Commerce\Adyen\Payment\Notification;
 
 /**
  * Implements hook_commerce_payment_method_info().
@@ -56,7 +58,7 @@ function commerce_adyen_commerce_payment_transaction_status_info() {
  * @see commerce_payment_commerce_payment_transaction_insert()
  */
 function commerce_adyen_commerce_payment_transaction_insert(\stdClass $transaction) {
-  $adyen_transaction = new Payment\Transaction($transaction->order_id);
+  $adyen_transaction = new Transaction($transaction->order_id);
 
   // Check the transaction is authorised.
   if ($adyen_transaction->isAuthorised()) {
@@ -121,13 +123,13 @@ function commerce_adyen_commerce_order_update(\stdClass $order) {
  */
 function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $order, \stdClass $data) {
   switch ($event_code) {
-    case Payment\Notification::AUTHORISATION:
-    case Payment\Notification::PENDING:
+    case Notification::AUTHORISATION:
+    case Notification::PENDING:
       // Load/create transaction object.
-      $transaction = new Payment\Transaction($order);
+      $transaction = new Transaction($order);
 
       if ($data->success) {
-        if (Payment\Notification::AUTHORISATION === $event_code) {
+        if (Notification::AUTHORISATION === $event_code) {
           if (!$transaction->isAuthorised()) {
             $transaction->authorise($data->pspReference);
 
@@ -138,7 +140,7 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
         }
         // This state is available in case of "Boleto"
         // payments. Capturing is not needed.
-        elseif (Payment\Notification::PENDING === $event_code) {
+        elseif (Notification::PENDING === $event_code) {
           if (!$transaction->isPending()) {
             $transaction->pending($data->pspReference);
 
@@ -158,16 +160,16 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
       }
       break;
 
-    case Payment\Notification::CAPTURE:
-      $transaction = new Payment\Transaction($order);
+    case Notification::CAPTURE:
+      $transaction = new Transaction($order);
 
       if ($data->success && !$transaction->isFinalized()) {
         $transaction->finalize();
       }
       break;
 
-    case Payment\Notification::CANCELLATION:
-      $transaction = new Payment\Transaction($order);
+    case Notification::CANCELLATION:
+      $transaction = new Transaction($order);
       $transaction->fail($data->pspReference);
 
       commerce_order_status_update($order, 'canceled');

@@ -1,17 +1,11 @@
 <?php
-/**
- * @file
- * OpenInvoice checkout controller.
- */
 
 namespace Commerce\Adyen\Payment\OpenInvoice;
 
 use Commerce\Adyen\Payment\Controller\Checkout;
 
 /**
- * Class CheckoutController.
- *
- * @package Commerce\Adyen\Payment\OpenInvoice
+ * OpenInvoice checkout controller.
  */
 class CheckoutController extends Checkout {
 

@@ -1,10 +1,15 @@
 <?php
+
 /**
  * @file
  * Adyen payment.
  */
 
-use Commerce\Adyen\Payment;
+use Adyen\Contract;
+use Adyen\Environment;
+use Commerce\Adyen\Payment\Controller\Checkout;
+use Commerce\Adyen\Payment\Authorisation\Request;
+use Commerce\Adyen\Payment\Authorisation\Response;
 
 /**
  * Implements PAYMENT_METHOD_BASE_settings_form().
@@ -19,7 +24,7 @@ use Commerce\Adyen\Payment;
 function commerce_adyen_settings_form(array $settings) {
   $notification_url = url(COMMERCE_ADYEN_NOTIFICATION_URL, ['absolute' => TRUE]);
   $payment_types = commerce_adyen_payment_types();
-  $backend_link = sprintf('https://ca-%s.adyen.com/ca/ca', isset($settings['mode']) ? $settings['mode'] : \Adyen\Environment::TEST);
+  $backend_link = sprintf('https://ca-%s.adyen.com/ca/ca', isset($settings['mode']) ? $settings['mode'] : Environment::TEST);
   $types = [];
   $form = [];
 
@@ -51,10 +56,10 @@ function commerce_adyen_settings_form(array $settings) {
     '#type' => 'radios',
     '#title' => t('Mode'),
     '#required' => TRUE,
-    '#default_value' => \Adyen\Environment::TEST,
+    '#default_value' => Environment::TEST,
     '#options' => [
-      \Adyen\Environment::TEST => t('Test'),
-      \Adyen\Environment::LIVE => t('Live'),
+      Environment::TEST => t('Test'),
+      Environment::LIVE => t('Live'),
     ],
   ];
 
@@ -137,9 +142,9 @@ function commerce_adyen_settings_form(array $settings) {
     '#title' => t('Recurring contract'),
     '#empty_option' => t('Do not used'),
     '#options' => [
-      \Adyen\Contract::ONECLICK => t('One click'),
-      \Adyen\Contract::RECURRING => t('Recurring'),
-      \Adyen\Contract::ONECLICK_RECURRING => t('One click, recurring'),
+      Contract::ONECLICK => t('One click'),
+      Contract::RECURRING => t('Recurring'),
+      Contract::ONECLICK_RECURRING => t('One click, recurring'),
     ],
   ];
 
@@ -226,7 +231,7 @@ function commerce_adyen_submit_form(array $payment_method, array &$pane_values, 
     ];
 
     foreach ($payment_types as $name => $data) {
-      /* @var Payment\Controller\Payment $payment_controller */
+      /* @var \Commerce\Adyen\Payment\Controller\Payment $payment_controller */
       $payment_controller = $data['controllers']['payment'];
 
       $options[$name] = $data['label'];
@@ -314,7 +319,7 @@ function commerce_adyen_submit_form_submit(array $payment_method, array $form, a
     if (!empty($form['#checkout_controller']) && !empty($form[$payment_type]) && !empty($values[$payment_type])) {
       $checkout_controller = $form['#checkout_controller'];
 
-      if ($checkout_controller instanceof Payment\Controller\Checkout) {
+      if ($checkout_controller instanceof Checkout) {
         $checkout_controller->checkoutFormValidate($form[$payment_type], $values[$payment_type]);
       }
     }
@@ -337,7 +342,7 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
   $redirect_available = TRUE;
 
   try {
-    $payment = new Payment\Authorisation\Request($order, $payment_method);
+    $payment = new Request($order, $payment_method);
 
     if (!empty($payment_method['settings']['recurring'])) {
       $payment->setRecurringContract($payment_method['settings']['recurring']);
@@ -392,7 +397,7 @@ function commerce_adyen_redirect_form(array $form, array &$form_state, \stdClass
 function commerce_adyen_redirect_form_validate(\stdClass $order, array $payment_method) {
   try {
     // GET request should be here.
-    $payment = new Payment\Authorisation\Response($order, $payment_method);
+    $payment = new Response($order, $payment_method);
     $status = $payment->getAuthenticationResult();
 
     switch ($status) {
@@ -447,7 +452,7 @@ function commerce_adyen_redirect_form_validate(\stdClass $order, array $payment_
  */
 function commerce_adyen_redirect_form_pre_render(array $form) {
   // Remove Drupal fields from a form (such as "form_token", "form_id" etc).
-  // This needs to be done since Adyen will generate a signature from submitted
+  // This needs to be done since Adyen will generate signature using submitted
   // data and will expect only those fields which described in API. Any other
   // data will lead to wrong signature of payment request.
   foreach (array_diff(element_children($form), array_keys(iterator_to_array($form['#payment']))) as $name) {

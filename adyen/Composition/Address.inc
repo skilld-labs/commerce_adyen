@@ -1,15 +1,9 @@
 <?php
-/**
- * @file
- * Address for OpenInvoice payment.
- */
 
 namespace Commerce\Adyen\Payment\Composition;
 
 /**
- * Class Address.
- *
- * @package Commerce\Adyen\Payment\Composition
+ * Address for OpenInvoice payment.
  */
 class Address {
 
@@ -37,9 +31,9 @@ class Address {
   /**
    * ISO 3166-1 Alpha 2 country code.
    *
-   * @link https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
-   *
    * @var string
+   *
+   * @link https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
    */
   private $country = '';
   /**

@@ -1,23 +1,19 @@
 <?php
-/**
- * @file
- * Payment authorisation request.
- */
 
 namespace Commerce\Adyen\Payment\Authorisation;
 
 use Adyen\Contract;
 use Adyen\Service\Recurring;
-use Commerce\Adyen\Payment;
+use Commerce\Adyen\Payment\Client;
+use Commerce\Adyen\Payment\ShopperInteraction;
+use Commerce\Adyen\Payment\Controller\Payment;
 
 /**
- * Class Request.
- *
- * @package Commerce\Adyen\Payment\Authorisation
+ * Payment authorisation request.
  */
 class Request extends Signature {
 
-  use Payment\Client;
+  use Client;
 
   /**
    * Default endpoint to send the request.
@@ -32,8 +28,7 @@ class Request extends Signature {
    */
   const ENDPOINT_DETAILS = 'details';
   /**
-   * Send the request there together with "brandCode"
-   * parameter to skip payment method selection.
+   * Send request together with "brandCode" to skip payment method selection.
    */
   const ENDPOINT_SKIP_DETAILS = 'skipDetails';
 
@@ -74,15 +69,10 @@ class Request extends Signature {
     $this->setShopperEmail($order->mail);
     // For "Anonymous" users we need to pass email as shopper reference, it was
     // flagged by the Adyen. Otherwise, we can get large fraud score.
-    if (!(bool) $order->uid) {
-      $this->setShopperReference($order->mail);
-    }
-    else {
-      $this->setShopperReference($order_wrapper->owner->name->value());
-    }
+    $this->setShopperReference($order->uid > 0 ? $order_wrapper->owner->name->value() : $order->mail);
     $this->setShopperLocale($payment_method['settings']['shopper_locale']);
     $this->setCountryCode($order_wrapper->commerce_customer_billing->commerce_customer_address->country->value());
-    $this->setShopperInteraction(Payment\ShopperInteraction::ECOMMERCE);
+    $this->setShopperInteraction(ShopperInteraction::ECOMMERCE);
     $this->setMerchantReturnData($order->data['payment_redirect_key']);
     $this->setEndpoint(self::ENDPOINT_PAY);
 
@@ -418,7 +408,7 @@ class Request extends Signature {
     // contract type and to "ContAuth" for "RECURRING".
     // @see https://github.com/Adyen/php/blob/master/5.Recurring/soap/submit-recurring-payment.php
     if (Contract::RECURRING === $recurring_contract) {
-      $this->setShopperInteraction(Payment\ShopperInteraction::CONTAUTH);
+      $this->setShopperInteraction(ShopperInteraction::CONTAUTH);
     }
 
     $this->data['recurringContract'] = $recurring_contract;
@@ -483,10 +473,10 @@ class Request extends Signature {
   /**
    * Extend payment authorisation request.
    *
-   * @param Payment\Controller\Payment $controller
+   * @param Payment $controller
    *   Object with additional payment data.
    */
-  public function extend(Payment\Controller\Payment $controller) {
+  public function extend(Payment $controller) {
     $controller->setPayment($this);
     // This value MUST be saved into a variable, because payment controller
     // can modify values in "$this->data" and they are will not be available

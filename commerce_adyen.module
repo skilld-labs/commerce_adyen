@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Commerce Adyen.
@@ -37,7 +38,9 @@ define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_PENDING', 'pending');
  */
 define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_FAILURE', 'failure');
 
-use Commerce\Adyen\Payment;
+use Commerce\Adyen\Payment\Capture;
+use Commerce\Adyen\Payment\Controller\Payment;
+use Commerce\Adyen\Payment\Controller\Checkout;
 
 /**
  * Implements hook_menu().
@@ -104,15 +107,15 @@ function commerce_adyen_payment_types() {
         throw new \InvalidArgumentException(t('Adyen payment type must have definition of payment controller.'));
       }
 
-      if (!is_subclass_of($payment_type['controllers']['payment'], Payment\Controller\Payment::class)) {
+      if (!is_subclass_of($payment_type['controllers']['payment'], Payment::class)) {
         throw new \InvalidArgumentException(t('Adyen payment type controller must be inherited from %class.', [
-          '%class' => Payment\Controller\Payment::class,
+          '%class' => Payment::class,
         ]));
       }
 
-      if (isset($payment_type['controllers']['checkout']) && !is_subclass_of($payment_type['controllers']['checkout'], Payment\Controller\Checkout::class)) {
+      if (isset($payment_type['controllers']['checkout']) && !is_subclass_of($payment_type['controllers']['checkout'], Checkout::class)) {
         throw new \InvalidArgumentException(t('Adyen payment checkout controller must be inherited from %class.', [
-          '%class' => Payment\Controller\Checkout::class,
+          '%class' => Checkout::class,
         ]));
       }
 
@@ -133,8 +136,8 @@ function commerce_adyen_payment_types() {
   drupal_alter(__FUNCTION__, $payment_types);
 
   // Validate payment types after alteration.
-  foreach ($payment_types as $name => $data) {
-    $add_payment_type($name, $data);
+  foreach ($payment_types as $name => $payment_type) {
+    $add_payment_type($name, $payment_type);
   }
 
   return $payment_types;
@@ -159,7 +162,7 @@ function commerce_adyen_capture_request(\stdClass $order) {
     }
 
     if (empty($order->data[$flag])) {
-      $capture = new Payment\Capture($order);
+      $capture = new Capture($order);
       $options = ['%order_number' => $order->order_number];
 
       if ($capture->isAvailable()) {
@@ -223,8 +226,8 @@ function commerce_adyen_amount($amount, $currency) {
  * @param array[] $payment_types
  *   List of payment types. Must be result of "commerce_adyen_payment_types()".
  *
- * @return Payment\Controller\Payment|Payment\Controller\Checkout|NULL
- *   NULL is payment type class cannot be instantiated.
+ * @return Payment|Checkout|null
+ *   NULL if payment type class cannot be instantiated.
  */
 function commerce_adyen_invoke_controller($controller, $payment_type, array $settings = NULL, array $payment_types = NULL) {
   if (NULL === $payment_types) {

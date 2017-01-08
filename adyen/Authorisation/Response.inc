@@ -1,17 +1,11 @@
 <?php
-/**
- * @file
- * Payment authorisation response.
- */
 
 namespace Commerce\Adyen\Payment\Authorisation;
 
 use Commerce\Adyen\Payment\Transaction;
 
 /**
- * Class Response.
- *
- * @package Commerce\Adyen\Payment\Authorisation
+ * Payment authorisation response.
  */
 class Response extends Signature {
 
@@ -22,6 +16,8 @@ class Response extends Signature {
    */
   const ERROR = 'ERROR';
   /**
+   * Payment in pending.
+   *
    * It is not possible to obtain the final status of the payment. This
    * can happen if the systems providing final status information for the
    * payment are unavailable, or if the shopper needs to take further action
@@ -29,10 +25,12 @@ class Response extends Signature {
    */
   const PENDING = 'PENDING';
   /**
-   * Payment was refused. Payment authorisation was unsuccessful.
+   * Payment authorisation was unsuccessful.
    */
   const REFUSED = 'REFUSED';
   /**
+   * Payment cancelled.
+   *
    * Payment was cancelled by the shopper before completion, or the shopper
    * returned to the merchant's site before completing the transaction.
    */

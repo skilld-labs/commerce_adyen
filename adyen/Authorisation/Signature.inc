@@ -1,8 +1,4 @@
 <?php
-/**
- * @file
- * Authorisation Signature.
- */
 
 namespace Commerce\Adyen\Payment\Authorisation;
 
@@ -10,15 +6,15 @@ use Adyen\Util\Util;
 use Commerce\Adyen\Payment\Facade;
 
 /**
- * Class Signature.
- *
- * @package Commerce\Adyen\Payment\Authorisation
+ * Authorisation signature.
  */
 abstract class Signature implements \Iterator {
 
   use Facade;
 
   /**
+   * Payment data.
+   *
    * @var array
    */
   protected $data = [];

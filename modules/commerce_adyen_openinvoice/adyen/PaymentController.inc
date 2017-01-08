@@ -1,8 +1,4 @@
 <?php
-/**
- * @file
- * OpenInvoice payment controller.
- */
 
 namespace Commerce\Adyen\Payment\OpenInvoice;
 
@@ -11,9 +7,7 @@ use Commerce\Adyen\Payment\Composition\Address;
 use Commerce\Adyen\Payment\Composition\Shopper;
 
 /**
- * Class PaymentController.
- *
- * @package Commerce\Adyen\Payment\OpenInvoice
+ * OpenInvoice payment controller.
  */
 class PaymentController extends Payment {
 

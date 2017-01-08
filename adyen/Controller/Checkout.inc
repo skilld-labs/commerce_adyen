@@ -1,17 +1,11 @@
 <?php
-/**
- * @file
- * Base checkout controller.
- */
 
 namespace Commerce\Adyen\Payment\Controller;
 
 use Commerce\Adyen\Payment\Facade;
 
 /**
- * Class Checkout.
- *
- * @package Commerce\Adyen\Payment\Controller
+ * Base checkout controller.
  */
 abstract class Checkout extends Controller {
 

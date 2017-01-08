@@ -1,8 +1,4 @@
 <?php
-/**
- * @file
- * Boleto checkout controller.
- */
 
 namespace Commerce\Adyen\Payment\Boleto;
 
@@ -10,9 +6,7 @@ use Commerce\Adyen\Payment\Controller\Checkout;
 use germanoricardi\helpers\BrazilianHelper;
 
 /**
- * Class CheckoutController.
- *
- * @package Commerce\Adyen\Payment\Boleto
+ * Boleto checkout controller.
  */
 class CheckoutController extends Checkout {
 
@@ -67,4 +61,5 @@ class CheckoutController extends Checkout {
 
     return TRUE;
   }
+
 }
