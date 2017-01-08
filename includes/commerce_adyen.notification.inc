@@ -5,6 +5,8 @@
  * Notifications receiver.
  */
 
+use Commerce\Adyen\Payment\Exception\NotificationException;
+
 /**
  * {@inheritdoc}
  *
@@ -13,22 +15,29 @@
  * @internal
  */
 function commerce_adyen_notification() {
-  $watchdog = function (\Exception $e = NULL) {
+  $dump = function ($variable) {
+    ob_start();
+    var_dump($variable);
+
+    return ob_get_clean();
+  };
+
+  $watchdog = function (\Exception $e = NULL) use ($dump) {
     $message = "Notification has been received. <pre>@data</pre>";
     $arguments = [
-      '@data' => var_export($_POST, TRUE),
+      '@data' => $dump($_POST),
     ];
 
     if (NULL !== $e) {
-      $message = 'Notification has' . ($e instanceof \RuntimeException ? ' ' : ' not ') . 'been received and exception been thrown: <pre>@exception</pre><pre>@data</pre>';
-      $arguments['@exception'] = var_export($e, TRUE);
+      $message = 'Notification has been handled' . ($e instanceof NotificationException ? ' wrongly' : '') . ' and exception been thrown: <pre>@exception</pre><pre>@data</pre>';
+      $arguments['@exception'] = $dump($e);
     }
 
     watchdog(COMMERCE_ADYEN_PAYMENT_METHOD, $message, $arguments);
   };
 
   try {
-    // POST request should be here.
+    // POST request should be here. No sense to let Drupal continue working.
     if (empty($_POST)) {
       throw new \RuntimeException('Adyen notification is empty.');
     }
@@ -36,6 +45,7 @@ function commerce_adyen_notification() {
     $data = (object) $_POST;
     $order = commerce_order_load_by_number($data->merchantReference);
 
+    // Order cannot be located/loaded. No sense to let Drupal continue working.
     if (FALSE === $order) {
       throw new \RuntimeException('Authorisation request made with incorrect "merchantReference" property which must be a valid order number.');
     }
@@ -56,17 +66,20 @@ function commerce_adyen_notification() {
       }
     }
 
+    // Log the notification (data from POST request).
     $watchdog();
+
+    // Notify subscribed modules about notification.
     module_invoke_all(__FUNCTION__, $data->eventCode, $order, $data);
   }
-  // All runtime exceptions does not mean that we didn't receive notification.
-  catch (\RuntimeException $e) {
-    $watchdog($e);
-  }
-  // Something went wrong - notification should be put in a queue.
-  catch (\Exception $e) {
+  // Something went terribly wrong - notification should be put in a queue.
+  catch (NotificationException $e) {
     $watchdog($e);
     exit();
+  }
+  // All other exceptions does not mean that we didn't handle notification.
+  catch (\Exception $e) {
+    $watchdog($e);
   }
 
   // Return "[accepted]" to Adyen. This is essential to let it know that
