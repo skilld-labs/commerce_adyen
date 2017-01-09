@@ -140,11 +140,13 @@ class Request extends Signature {
   /**
    * Set allowed payment methods.
    *
-   * @param string $payment_methods
-   *   A comma-separated list of the allowed payment methods.
+   * @param string[] $payment_methods
+   *   A list of allowed payment methods.
+   *
+   * @link https://docs.adyen.com/developers/hpp-manual#hpppaymentfields
    */
-  public function setAllowedMethods($payment_methods) {
-    $this->data['allowedMethods'] = $payment_methods;
+  public function setAllowedMethods(array $payment_methods) {
+    $this->data['allowedMethods'] = implode(',', array_map('trim', $payment_methods));
   }
 
   /**
