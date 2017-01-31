@@ -168,11 +168,16 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
       }
       break;
 
+    case Notification::EXPIRE:
     case Notification::CANCELLATION:
       $transaction = new Transaction($order);
-      $transaction->fail($data->pspReference);
 
-      commerce_order_status_update($order, 'canceled');
+      // Do not allow expire/cancel finalized transactions.
+      if (!$transaction->isFinalized()) {
+        $transaction->fail($data->pspReference);
+
+        commerce_order_status_update($order, 'canceled');
+      }
       break;
   }
 
