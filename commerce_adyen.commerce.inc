@@ -132,6 +132,8 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
         if (Notification::AUTHORISATION === $event_code) {
           if (!$transaction->isAuthorised()) {
             $transaction->authorise($data->pspReference);
+            $transaction->setPayload($data);
+            $transaction->save();
 
             // Send capture request automatically.
             commerce_adyen_capture_request($order);
@@ -143,28 +145,35 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
         elseif (Notification::PENDING === $event_code) {
           if (!$transaction->isPending()) {
             $transaction->pending($data->pspReference);
+            $transaction->setPayload($data);
+            $transaction->save();
 
             commerce_order_status_update($order, 'pending');
             commerce_payment_redirect_pane_next_page($order);
           }
         }
       }
-      else {
-        // Allow to fail only new transaction because authorised or
-        // pending transaction were processed.
-        if ($transaction->isNew()) {
-          // Something went wrong: order isn't paid.
-          $transaction->fail($data->pspReference);
-          commerce_payment_redirect_pane_previous_page($order);
-        }
+      // Allow to fail only new transaction because authorised or
+      // pending transaction were processed.
+      elseif ($transaction->isNew()) {
+        // Something went wrong: order isn't paid.
+        $transaction->fail($data->pspReference);
+        $transaction->setPayload($data);
+        $transaction->save();
+
+        commerce_payment_redirect_pane_previous_page($order);
       }
       break;
 
     case Notification::CAPTURE:
-      $transaction = new Transaction($order);
+      if ($data->success) {
+        $transaction = new Transaction($order);
 
-      if ($data->success && !$transaction->isFinalized()) {
-        $transaction->finalize();
+        if (!$transaction->isFinalized()) {
+          $transaction->finalize();
+          $transaction->setPayload($data);
+          $transaction->save();
+        }
       }
       break;
 
@@ -175,14 +184,11 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
       // Do not allow expire/cancel finalized transactions.
       if (!$transaction->isFinalized()) {
         $transaction->fail($data->pspReference);
+        $transaction->setPayload($data);
+        $transaction->save();
 
         commerce_order_status_update($order, 'canceled');
       }
       break;
-  }
-
-  if (isset($transaction)) {
-    $transaction->setPayload($data);
-    $transaction->save();
   }
 }
