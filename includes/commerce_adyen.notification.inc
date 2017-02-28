@@ -37,12 +37,13 @@ function commerce_adyen_notification() {
   };
 
   try {
+    $data = (object) $_POST;
+
     // POST request should be here. No sense to let Drupal continue working.
-    if (empty($_POST)) {
+    if (empty($_POST) || empty($data->merchantReference)) {
       throw new \RuntimeException('Adyen notification is empty.');
     }
 
-    $data = (object) $_POST;
     $order = commerce_order_load_by_number($data->merchantReference);
 
     // Order cannot be located/loaded. No sense to let Drupal continue working.
