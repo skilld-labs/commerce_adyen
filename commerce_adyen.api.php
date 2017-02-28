@@ -60,14 +60,14 @@ function hook_commerce_adyen_payment_authorisation_response_alter(\Commerce\Adye
  *
  * Correct use case: use notifications to finalize the payment transaction.
  *
- * @param \Commerce\Adyen\Payment\Transaction $transaction
+ * @param \Commerce\Adyen\Payment\Transaction\Payment $transaction
  *   Payment transaction.
  * @param \stdClass $order
  *   Commerce order.
  *
  * @see \Commerce\Adyen\Payment\Capture::request()
  */
-function hook_commerce_adyen_capture_received(\Commerce\Adyen\Payment\Transaction $transaction, \stdClass $order) {
+function hook_commerce_adyen_capture_received(\Commerce\Adyen\Payment\Transaction\Payment $transaction, \stdClass $order) {
   /* @var \EntityDrupalWrapper $message */
   $message = entity_metadata_wrapper('message', message_create('commerce_adyen', [
     'arguments' => [
@@ -84,14 +84,44 @@ function hook_commerce_adyen_capture_received(\Commerce\Adyen\Payment\Transactio
 /**
  * React on rejecting capture request by Adyen.
  *
- * @param \Commerce\Adyen\Payment\Transaction $transaction
+ * @param \Commerce\Adyen\Payment\Transaction\Payment $transaction
  *   Payment transaction.
  * @param \stdClass $order
  *   Commerce order.
  *
  * @see \Commerce\Adyen\Payment\Capture::request()
  */
-function hook_commerce_adyen_capture_rejected(\Commerce\Adyen\Payment\Transaction $transaction, \stdClass $order) {
+function hook_commerce_adyen_capture_rejected(\Commerce\Adyen\Payment\Transaction\Payment $transaction, \stdClass $order) {
+
+}
+
+/**
+ * React on receiving refund request by Adyen.
+ *
+ * @param \Commerce\Adyen\Payment\Transaction\Refund $transaction
+ *   Payment transaction.
+ * @param \stdClass $order
+ *   Commerce order.
+ *
+ * @see \Commerce\Adyen\Payment\Refund
+ * @see \Commerce\Adyen\Payment\Modification::request()
+ */
+function hook_commerce_adyen_refund_received(\Commerce\Adyen\Payment\Transaction\Refund $transaction, \stdClass $order) {
+
+}
+
+/**
+ * React on rejecting refund request by Adyen.
+ *
+ * @param \Commerce\Adyen\Payment\Transaction\Refund $transaction
+ *   Payment transaction.
+ * @param \stdClass $order
+ *   Commerce order.
+ *
+ * @see \Commerce\Adyen\Payment\Refund
+ * @see \Commerce\Adyen\Payment\Modification::request()
+ */
+function hook_commerce_adyen_refund_rejected(\Commerce\Adyen\Payment\Transaction\Refund $transaction, \stdClass $order) {
 
 }
 
@@ -111,7 +141,7 @@ function hook_commerce_adyen_capture_rejected(\Commerce\Adyen\Payment\Transactio
 function hook_commerce_adyen_notification($event_code, \stdClass $order, \stdClass $data) {
   switch ($event_code) {
     case \Commerce\Adyen\Payment\Notification::CANCELLATION:
-      $transaction = new \Commerce\Adyen\Payment\Transaction($order);
+      $transaction = commerce_adyen_get_transaction_instance('payment', $order);
       $transaction->setStatus(COMMERCE_PAYMENT_STATUS_FAILURE);
       $transaction->save();
 
@@ -154,6 +184,38 @@ function hook_commerce_adyen_payment_types() {
  */
 function hook_commerce_adyen_payment_types_alter(array &$payment_types) {
   unset($payment_types['openinvoice']);
+}
+
+/**
+ * Provide transactions implementations.
+ *
+ * @return string[]
+ *   An associative array where key - is an unique name of transaction type
+ *   and value - is fully qualified name of class implementing the logic.
+ *
+ * @see commerce_adyen_transaction_types()
+ */
+function hook_commerce_adyen_transaction_types() {
+  $types = [];
+
+  // Currently we are having only two transaction types.
+  $types['payment'] = \Commerce\Adyen\Payment\Transaction\Payment::class;
+  $types['refund'] = \Commerce\Adyen\Payment\Transaction\Refund::class;
+
+  return $types;
+}
+
+/**
+ * Allow to alter existing definitions of transaction types.
+ *
+ * @param string[] $transaction_types
+ *   List of transaction types and FQN of classes implementing the logic.
+ *
+ * @see hook_commerce_adyen_transaction_types()
+ */
+function hook_commerce_adyen_transaction_types_alter(array &$transaction_types) {
+  // Change implementing class for refund transaction.
+  $transaction_types['refund'] = \Commerce\Adyen\Payment\Transaction\Refund::class;
 }
 
 /**

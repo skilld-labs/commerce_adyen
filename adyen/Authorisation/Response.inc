@@ -2,14 +2,14 @@
 
 namespace Commerce\Adyen\Payment\Authorisation;
 
-use Commerce\Adyen\Payment\Transaction;
+use Commerce\Adyen\Payment\Transaction\Payment;
 
 /**
  * Payment authorisation response.
+ *
+ * @link https://docs.adyen.com/developers/hpp-manual#hpppaymentresponse
  */
 class Response extends Signature {
-
-  // @see https://docs.adyen.com/developers/hpp-manual#hpppaymentresponse
 
   /**
    * An error occurred during the payment processing.
@@ -43,7 +43,7 @@ class Response extends Signature {
   /**
    * Payment transaction.
    *
-   * @var Transaction
+   * @var Payment
    */
   private $transaction;
 
@@ -82,7 +82,7 @@ class Response extends Signature {
       throw new \UnexpectedValueException(t('Received Adyen response with invalid signature.'));
     }
 
-    $this->transaction = new Transaction($order);
+    $this->transaction = commerce_adyen_get_transaction_instance('payment', $order);
     $this->transaction->setPayload($this->data);
     $this->transaction->setRemoteStatus($this->data['authResult']);
 
@@ -116,7 +116,7 @@ class Response extends Signature {
   /**
    * Returns payment transaction.
    *
-   * @return Transaction
+   * @return Payment
    *   Payment transaction.
    */
   public function getTransaction() {

@@ -5,7 +5,6 @@
  * Commerce integration.
  */
 
-use Commerce\Adyen\Payment\Transaction;
 use Commerce\Adyen\Payment\Notification;
 
 /**
@@ -58,7 +57,7 @@ function commerce_adyen_commerce_payment_transaction_status_info() {
  * @see commerce_payment_commerce_payment_transaction_insert()
  */
 function commerce_adyen_commerce_payment_transaction_insert(\stdClass $transaction) {
-  $adyen_transaction = new Transaction($transaction->order_id);
+  $adyen_transaction = commerce_adyen_get_transaction_instance('payment', $transaction->order_id);
 
   // Check the transaction is authorised.
   if ($adyen_transaction->isAuthorised()) {
@@ -126,7 +125,7 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
     case Notification::AUTHORISATION:
     case Notification::PENDING:
       // Load/create transaction object.
-      $transaction = new Transaction($order);
+      $transaction = commerce_adyen_get_transaction_instance('payment', $order);
 
       if ($data->success) {
         if (Notification::AUTHORISATION === $event_code) {
@@ -167,7 +166,7 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
 
     case Notification::CAPTURE:
       if ($data->success) {
-        $transaction = new Transaction($order);
+        $transaction = commerce_adyen_get_transaction_instance('payment', $order);
 
         if (!$transaction->isFinalized()) {
           $transaction->finalize();
@@ -179,7 +178,7 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
 
     case Notification::EXPIRE:
     case Notification::CANCELLATION:
-      $transaction = new Transaction($order);
+      $transaction = commerce_adyen_get_transaction_instance('payment', $order);
 
       // Do not allow expire/cancel finalized transactions.
       if (!$transaction->isFinalized()) {
@@ -189,6 +188,14 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
 
         commerce_order_status_update($order, 'canceled');
       }
+      break;
+
+    case Notification::REFUND:
+      // @todo Handle refund notification.
+      break;
+
+    case Notification::REFUND_FAILED:
+      // @todo Handle failed refund notification.
       break;
   }
 }
