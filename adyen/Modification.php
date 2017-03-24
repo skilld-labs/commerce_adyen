@@ -48,7 +48,7 @@ abstract class Modification {
    */
   public function __construct($order, $remote_transaction_status, $modification_type) {
     $this->modificationType = $modification_type;
-    $this->transaction = commerce_adyen_get_transaction_instance($this->getTransactionType(), $order);
+    $this->transaction = commerce_adyen_get_transaction_instance($this->getTransactionType(), $order, $remote_transaction_status);
   }
 
   /**
