@@ -62,7 +62,11 @@ abstract class Modification {
   /**
    * Send a modification request.
    *
+   * @return bool
+   *   Whether request was successfully sent or not.
+   *
    * @throws AdyenException
+   * @throws \InvalidArgumentException
    *
    * @link https://github.com/Adyen/adyen-php-sample-code/blob/master/4.Modifications/httppost/refund.php
    * @link https://github.com/Adyen/adyen-php-sample-code/blob/master/4.Modifications/httppost/capture.php
@@ -74,7 +78,7 @@ abstract class Modification {
 
     // Make an API call to tell Adyen that we are waiting for notification
     // from it.
-    $request = (new ModificationBase($this->getClient($payment_method)))->{$this->modificationType}([
+    $request = [
       'reference' => $order->order_number,
       'merchantAccount' => $payment_method['settings']['merchant_account'],
       'originalReference' => $this->transaction->getRemoteId(),
@@ -83,13 +87,14 @@ abstract class Modification {
         // Adyen doesn't accept amount with preceding minus.
         'value' => abs(commerce_adyen_amount($this->transaction->getAmount(), $currency_code)),
       ],
-    ]);
+    ];
 
-    $status = "[{$this->modificationType}-received]" === $request['response'];
+    $modification = (new ModificationBase($this->getClient($payment_method)))->{$this->modificationType}($request);
+    $status = "[{$this->modificationType}-received]" === $modification['response'];
     $hook = $status ? 'received' : 'rejected';
 
-    watchdog(COMMERCE_ADYEN_PAYMENT_METHOD, "Request for %modification_type for the %order_number order has been {$hook} by Adyen.", [
-      '%order_number' => $order->order_number,
+    watchdog(COMMERCE_ADYEN_PAYMENT_METHOD, "Request for %modification_type has been {$hook} by Adyen: <pre>@payload</pre>", [
+      '@payload' => var_export($request, TRUE),
       '%modification_type' => $this->modificationType,
     ]);
 
