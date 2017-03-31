@@ -12,6 +12,8 @@ class Capture extends Modification {
    */
   public function __construct($order) {
     parent::__construct($order, COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED, self::CAPTURE);
+
+    $this->transaction->setAmount($this->transaction->getOrder()->commerce_order_total->amount->value());
   }
 
   /**
