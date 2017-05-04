@@ -142,11 +142,19 @@ class Request extends Signature {
    *
    * @param string[] $payment_methods
    *   A list of allowed payment methods.
-   *
-   * @link https://docs.adyen.com/developers/hpp-manual#hpppaymentfields
    */
   public function setAllowedMethods(array $payment_methods) {
-    $this->data['allowedMethods'] = implode(',', array_map('trim', $payment_methods));
+    $this->setPaymentMethods('allowed', $payment_methods);
+  }
+
+  /**
+   * Set blocked payment methods.
+   *
+   * @param string[] $payment_methods
+   *   A list of blocked payment methods.
+   */
+  public function setBlockedMethods(array $payment_methods) {
+    $this->setPaymentMethods('blocked', $payment_methods);
   }
 
   /**
@@ -493,6 +501,20 @@ class Request extends Signature {
    */
   public function signRequest() {
     $this->data['merchantSig'] = $this->getSignature();
+  }
+
+  /**
+   * Set allowed/blocked payment methods.
+   *
+   * @param string $type
+   *   One of available types: "allowed" or "blocked".
+   * @param array $payment_methods
+   *   A list of payment methods.
+   *
+   * @link https://docs.adyen.com/developers/api-reference/hosted-payment-pages-api#hpppaymentrequest
+   */
+  protected function setPaymentMethods($type, array $payment_methods) {
+    $this->data[$type . 'Methods'] = implode(',', array_map('trim', $payment_methods));
   }
 
 }
