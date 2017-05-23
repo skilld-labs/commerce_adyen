@@ -71,7 +71,10 @@ class PaymentController extends Payment {
       $percentage = ($line_item_total['amount'] / ($line_item_total['amount'] - $vat_amount) - 1) * 100;
 
       foreach ([
-        'itemAmount' => commerce_adyen_amount($line_item->commerce_unit_price->amount->value(), $currency_code),
+        // Referring to Adyen documentation we must send item price having VAT
+        // amount excluded.
+        // @link https://docs.adyen.com/developers/api-reference/payments-api/paymentrequest/paymentrequest-additionaldata/open-invoice-fields#openinvoicedataline
+        'itemAmount' => commerce_adyen_amount($line_item->commerce_unit_price->amount->value(), $currency_code) - $vat_amount,
         'description' => "{$label->value()} [$line_item_type]",
         'currencyCode' => $currency_code,
         'numberOfItems' => (int) $line_item->quantity->value(),
