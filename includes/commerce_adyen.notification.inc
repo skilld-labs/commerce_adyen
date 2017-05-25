@@ -22,10 +22,10 @@ function commerce_adyen_notification() {
     return ob_get_clean();
   };
 
-  $watchdog = function (\Exception $e = NULL) use ($dump) {
+  $watchdog = function ($data, \Exception $e = NULL) use ($dump) {
     $message = "Notification has been received. <pre>@data</pre>";
     $arguments = [
-      '@data' => $dump($_POST),
+      '@data' => $dump($data),
     ];
 
     if (NULL !== $e) {
@@ -56,31 +56,47 @@ function commerce_adyen_notification() {
     // The "success" or "live" properties will be strings with "true"
     // or "false" values.
     foreach ($data as $property => $value) {
-      switch (drupal_strtolower($value)) {
-        case 'true':
-          $data->$property = TRUE;
-          break;
+      if (is_string($value)) {
+        // Sometimes Adyen can transcend itself and send visually empty string
+        // as a value of properties like "success", but programmatically it's
+        // not true (space characters inside!!!).
+        $data->{$property} = trim($value);
 
-        case 'false':
-          $data->$property = FALSE;
-          break;
+        // Handle this part of idiotic cases. Why not to send "1" and "0"? Who
+        // knows...
+        switch (drupal_strtolower($data->{$property})) {
+          case 'true':
+            $data->{$property} = TRUE;
+            break;
+
+          case 'false':
+            $data->{$property} = FALSE;
+            break;
+        }
+      }
+    }
+
+    // Treat any kind of emptiness as explicit "FALSE".
+    foreach (['success', 'live'] as $property) {
+      if (empty($data->{$property})) {
+        $data->{$property} = FALSE;
       }
     }
 
     // Log the notification (data from POST request).
-    $watchdog();
+    $watchdog($data);
 
     // Notify subscribed modules about notification.
     module_invoke_all(__FUNCTION__, $data->eventCode, $order, $data);
   }
   // Something went terribly wrong - notification should be put in a queue.
   catch (NotificationException $e) {
-    $watchdog($e);
+    $watchdog($data, $e);
     exit();
   }
   // All other exceptions does not mean that we didn't handle notification.
   catch (\Exception $e) {
-    $watchdog($e);
+    $watchdog($data, $e);
   }
 
   // Return "[accepted]" to Adyen. This is essential to let it know that

@@ -66,6 +66,19 @@ class Response extends Signature {
       $query[urldecode($name)] = urldecode($value);
     }
 
+    // Query will contain:
+    // @code
+    // [
+    //   'authResult' => 'AUTHORISED',
+    //   'merchantReference' => 'DE-LW-7880',
+    //   'merchantReturnData' => 'ErO8-G_RWHQoXnsYE2RFDQnidI7guyYvlKNoHAqLXVg',
+    //   'merchantSig' => '3F2/9VUurEo6gYiDK52Tgiq6chfnDtw3ffDSx9VuWNM=',
+    //   'paymentMethod' => 'visa',
+    //   'pspReference' => '8524957053594505',
+    //   'shopperLocale' => 'de',
+    //   'skinCode' => 'iL6lEu2Q',
+    // ]
+    // @endcode
     $this->data = drupal_get_query_parameters($query);
 
     if (empty($this->data)) {
