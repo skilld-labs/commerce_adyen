@@ -57,13 +57,12 @@ function commerce_adyen_notification() {
     // or "false" values.
     foreach ($data as $property => $value) {
       if (is_string($value)) {
-        // Sometimes Adyen can transcend itself and send visually empty string
-        // as a value of properties like "success", but programmatically it's
-        // not true (space characters inside!!!).
+        // Sometimes Adyen can send visually empty strings as values
+        // of properties like "success", but programmatically it's not
+        // true (space characters inside).
         $data->{$property} = trim($value);
 
-        // Handle this part of idiotic cases. Why not to send "1" and "0"? Who
-        // knows...
+        // Convert string representations of booleans.
         switch (drupal_strtolower($data->{$property})) {
           case 'true':
             $data->{$property} = TRUE;
