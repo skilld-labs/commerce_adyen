@@ -27,31 +27,6 @@ function commerce_adyen_commerce_payment_method_info() {
 }
 
 /**
- * Implements hook_commerce_payment_transaction_status_info().
- */
-function commerce_adyen_commerce_payment_transaction_status_info() {
-  $module_path = drupal_get_path('module', 'commerce_adyen');
-  $info = [];
-
-  foreach ([
-    // Adyen have its own payment workflow: initially payment should get
-    // the authorisation confirmation and only then capturing could be
-    // done. This status must be set when Adyen responds to us.
-    COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED => [
-      'title' => t('Authorised'),
-      'total' => TRUE,
-    ],
-  ] as $status => $data) {
-    $info[$status] = $data + [
-      'status' => $status,
-      'icon' => "$module_path/icons/$status.png",
-    ];
-  }
-
-  return $info;
-}
-
-/**
  * Implements hook_commerce_payment_transaction_insert().
  *
  * @see commerce_payment_commerce_payment_transaction_insert()
