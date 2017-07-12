@@ -109,8 +109,12 @@ function commerce_adyen_commerce_adyen_notification($event_code, \stdClass $orde
             $transaction->setPayload($data);
             $transaction->save();
 
-            // Send capture request automatically.
-            commerce_adyen_capture_request($order);
+            // Send capture request automatically, if there were not disabled.
+            // (For example, because immediate capture enabled on the merchant
+            // account.)
+            if (!variable_get('commerce_adyen_disable_automatic_capture_on_authorisation', FALSE)) {
+              commerce_adyen_capture_request($order);
+            }
             commerce_payment_redirect_pane_next_page($order);
           }
         }
