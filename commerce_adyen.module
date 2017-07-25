@@ -186,7 +186,7 @@ function commerce_adyen_get_transaction_instance($type, $order, $remote_status =
     ]));
   }
 
-  return new $types[$type]($order, $remote_status);
+  return new $types[$type]($order, commerce_payment_method_instance_load(COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE), $remote_status);
 }
 
 /**

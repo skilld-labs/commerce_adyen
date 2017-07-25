@@ -12,23 +12,6 @@ class Payment extends TransactionBase {
   /**
    * {@inheritdoc}
    */
-  public function getPaymentMethodName() {
-    return COMMERCE_ADYEN_PAYMENT_METHOD;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getPaymentInstanceId() {
-    return COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE;
-  }
-
-  /**
-   * Authorise a transaction.
-   *
-   * @param string|int $remote_id
-   *   Remote identifier of a payment transaction.
-   */
   public function authorise($remote_id) {
     $this->setRemoteId($remote_id);
     $this->setStatus(COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED);
@@ -37,10 +20,7 @@ class Payment extends TransactionBase {
   }
 
   /**
-   * Check if payment was only authorised and waiting for capturing.
-   *
-   * @return bool
-   *   A state of check.
+   * {@inheritdoc}
    */
   public function isAuthorised() {
     return
@@ -74,10 +54,7 @@ class Payment extends TransactionBase {
   }
 
   /**
-   * Fail a transaction.
-   *
-   * @param string|int $remote_id
-   *   Remote identifier of a payment transaction.
+   * {@inheritdoc}
    */
   public function fail($remote_id) {
     $this->setRemoteId($remote_id);
@@ -87,10 +64,7 @@ class Payment extends TransactionBase {
   }
 
   /**
-   * Check if payment failed.
-   *
-   * @return bool
-   *   A state of check.
+   * {@inheritdoc}
    */
   public function isFailed() {
     return
@@ -99,7 +73,7 @@ class Payment extends TransactionBase {
   }
 
   /**
-   * Finalize a transaction. Must be used only after successful capturing.
+   * {@inheritdoc}
    */
   public function finalize() {
     $this->setStatus(COMMERCE_PAYMENT_STATUS_SUCCESS);
@@ -108,10 +82,7 @@ class Payment extends TransactionBase {
   }
 
   /**
-   * Check if payment has been finalized.
-   *
-   * @return bool
-   *   A state of check.
+   * {@inheritdoc}
    */
   public function isFinalized() {
     return

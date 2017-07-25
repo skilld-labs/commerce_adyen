@@ -18,7 +18,7 @@ class Refund extends Payment {
     $query = new \EntityFieldQuery();
     $query->entityCondition('entity_type', $entity_type);
     $query->propertyCondition('amount', 0, '<');
-    $query->propertyCondition('order_id', $this->orderWrapper->order_id->value());
+    $query->propertyCondition('order_id', $this->getOrder()->order_id->value());
     $query->propertyCondition('instance_id', $this->getPaymentInstanceId());
     $query->propertyCondition('payment_method', $this->getPaymentMethodName());
 
