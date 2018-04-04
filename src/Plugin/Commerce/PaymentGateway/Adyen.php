@@ -15,14 +15,14 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
 
 /**
- * Provides the On-site payment gateway.
+ * Provides the Adyen payment gateway.
  *
  * @CommercePaymentGateway(
  *   id = "adyen_onsite",
  *   label = "Adyen (On-site)",
  *   display_label = "Adyen",
  *   forms = {
- *     "add-payment-method" = "Drupal\commerce_adyen\PluginForm\Onsite\PaymentMethodAddForm",
+ *     "add-payment-method" = "Drupal\commerce_adyen\PluginForm\Adyen\AdyenPaymentMethodAddForm",
  *   },
  *   payment_method_types = {"credit_card"},
  *   credit_card_types = {
@@ -30,7 +30,7 @@ use Drupal\Core\Form\FormStateInterface;
  *   },
  * )
  */
-class Onsite extends OnsitePaymentGatewayBase implements OnsiteInterface {
+class Adyen extends OnsitePaymentGatewayBase implements AdyenInterface {
 
   /**
    * {@inheritdoc}
