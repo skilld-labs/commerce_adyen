@@ -13,10 +13,10 @@ process.
 
 ## Versions
 
-- **7.x-1.x** branch no longer be maintained.
+- **8.x-1.x** dev.
 - **7.x-2.x** actively maintained.
 
-**Version 7.x-2.x is still in development and no guarantees are provided about
+**Version 8.x-1.x is still in development and no guarantees are provided about
 its functionality. Use in a production environment at your own risk.**
 
 ## Installation
