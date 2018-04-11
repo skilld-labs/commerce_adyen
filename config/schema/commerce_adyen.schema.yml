@@ -1,3 +1,11 @@
+commerce_adyen.settings:
+  type: mapping
+  label: Settings
+  mapping:
+    commerce_adyen_authorise_forcibly:
+      type: boolean
+    commerce_adyen_disable_automatic_capture_on_authorisation:
+      type: boolean
 commerce_payment.commerce_payment_gateway.plugin.adyen_onsite:
   type: commerce_payment_gateway_configuration
   mapping:
