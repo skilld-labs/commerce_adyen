@@ -205,7 +205,7 @@ function commerce_adyen_get_transaction_instance($type, $order, $remote_status =
  */
 function commerce_adyen_services_collector($id, callable $resolver) {
   $cache_id = "commerce_adyen_services:$id";
-  $cache = cache_get($cache_id);
+  $cache = \Drupal::cache()->get($cache_id);
   $data = [];
 
   if (FALSE === $cache || empty($cache->data)) {
@@ -223,19 +223,19 @@ function commerce_adyen_services_collector($id, callable $resolver) {
     };
 
     // Collect data.
-    foreach (module_invoke_all($id) as $name => $item) {
+    foreach (\Drupal::moduleHandler()->invokeAll($id) as $name => $item) {
       $validator($name, $item);
     }
 
     // Allow other modules to alter the implementations.
-    drupal_alter($id, $data);
+    \Drupal::moduleHandler()->alter($id, $data);
 
     // Validate data again after alteration.
     foreach ($data as $name => $item) {
       $validator($name, $item);
     }
 
-    cache_set($cache_id, $data);
+    \Drupal::cache()->set($cache_id, $data);
   }
   else {
     $data = $cache->data;
@@ -272,7 +272,7 @@ function commerce_adyen_capture_request(\stdClass $order) {
           // request once we successfully did this.
           $order->data[$flag] = TRUE;
           // Save the order.
-          commerce_order_save($order);
+          $order->save();
         }
         else {
           throw new \RuntimeException(t('Capture request for the %order_number order was rejected by Adyen.', $options));
