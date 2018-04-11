@@ -1,5 +1,11 @@
 {
+  "name": "adyen",
+  "type": "library",
+  "description": "Adyen PHP Library.",
   "require": {
     "adyen/php-api-library": "1.*"
+  },
+  "autoload": {
+    "psr-4": { "Adyen\\Library\\": "src" }
   }
 }
