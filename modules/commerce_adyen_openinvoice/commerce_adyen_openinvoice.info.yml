@@ -1,7 +1,14 @@
-name: 'OpenInvoice'
-type: module
+name: OpenInvoice
 description: 'Allow to use OpenIvoice payments of two types: Klarna and AfterPay.'
+package: 'Commerce Adyen'
 core: 8.x
-package: 'Commerce'
+php: '5.5'
+autoload:
+  adyen:
+    - Commerce\Adyen\Payment\OpenInvoice
 dependencies:
+  - date
+  - commerce_vat
   - commerce_adyen
+  - commerce_customer
+type: module

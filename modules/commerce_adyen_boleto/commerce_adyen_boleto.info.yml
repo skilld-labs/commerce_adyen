@@ -1,7 +1,11 @@
-name: 'Commerce Boleto'
-type: module
+name: Boleto
 description: 'Allow to use Boleto payments.'
+package: 'Commerce Adyen'
 core: 8.x
-package: 'Commerce'
+php: '5.5'
+autoload:
+  adyen:
+    - Commerce\Adyen\Payment\Boleto
 dependencies:
   - commerce_adyen
+type: module
