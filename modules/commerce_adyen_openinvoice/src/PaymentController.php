@@ -1,6 +1,10 @@
 <?php
 namespace Drupal\commerce_adyen_openinvoice;
 
+use Drupal\commerce_adyen\Controller\Payment;
+use Commerce\Adyen\Payment\Composition\Address;
+use Commerce\Adyen\Payment\Composition\Shopper;
+
 /**
  * OpenInvoice payment controller.
  */

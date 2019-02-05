@@ -41,8 +41,8 @@ define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_FAILURE', 'failure');
 use Commerce\Adyen\Payment\Capture;
 use Commerce\Adyen\Payment\Transaction\Refund as RefundTransaction;
 use Commerce\Adyen\Payment\Transaction\Payment as PaymentTransaction;
-use Commerce\Adyen\Payment\Controller\Payment;
-use Commerce\Adyen\Payment\Controller\Checkout;
+use Drupal\commerce_adyen\Controller\Payment;
+use Drupal\commerce_adyen\Controller\Checkout;
 
 /**
  * Implements hook_menu().

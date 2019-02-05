@@ -169,8 +169,10 @@ class Adyen extends OnsitePaymentGatewayBase implements AdyenInterface {
     ];
 
     $types = [];
-    //TODO Upgrade this code.
+    $payment_types = commerce_adyen_payment_types();
     foreach ($payment_types as $payment_type => $data) {
+      // @todo retrive subtypes for payment method. Note that by default, it hasn't any subtype in drupal 7 version
+      /*$settings = NULL;
       $config_form = commerce_adyen_invoke_controller('payment', $payment_type, $settings, $payment_types)->configForm();
 
       if (!empty($config_form)) {
@@ -178,7 +180,7 @@ class Adyen extends OnsitePaymentGatewayBase implements AdyenInterface {
         $config_form['#title'] = $data['label'];
 
         $form['payment_types'][$payment_type] = $config_form;
-      }
+      }*/
 
       // Form a list of payment types and their labels.                                                                            
       $types[$payment_type] = $data['label'];

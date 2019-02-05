@@ -1,6 +1,8 @@
 <?php
 namespace Drupal\commerce_adyen_openinvoice;
 
+use Drupal\commerce_adyen\Controller\Checkout;
+
 /**
  * OpenInvoice checkout controller.
  */

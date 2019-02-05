@@ -1,6 +1,9 @@
 <?php
 namespace Drupal\commerce_adyen_boleto;
 
+use Drupal\commerce_adyen\Controller\Checkout;
+use germanoricardi\helpers\BrazilianHelper;
+
 /**
  * Boleto checkout controller.
  */

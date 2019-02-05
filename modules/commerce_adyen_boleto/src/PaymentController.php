@@ -1,6 +1,11 @@
 <?php
 namespace Drupal\commerce_adyen_boleto;
 
+//use Commerce\Adyen\Payment\Controller\Payment;
+use Drupal\commerce_adyen\Controller\Payment;
+use Commerce\Adyen\Payment\Composition\Address;
+use Commerce\Adyen\Payment\Composition\Shopper;
+
 /**
  * Boleto payment controller.
  */
