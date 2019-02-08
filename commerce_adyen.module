@@ -2,305 +2,19 @@
 
 /**
  * @file
- * Commerce Adyen.
+ * Defines common functionality for commerce adyen module.
  */
 
 /**
- * Name of payment method.
- */
-define('COMMERCE_ADYEN_PAYMENT_METHOD', 'commerce_adyen');
-/**
- * URL to send notifications to.
- */
-define('COMMERCE_ADYEN_NOTIFICATION_URL', 'commerce/adyen/notification');
-/**
- * Name of instances of payment method.
- */
-define('COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE', sprintf('%s|commerce_payment_%1$s', COMMERCE_ADYEN_PAYMENT_METHOD));
-/**
- * Drupal payment status. Do not mix up with "remote_status"!
- */
-define('COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED', 'authorised');
-/**
- * Remote status of a payment. Money has been captured.
- */
-define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_CAPTURED', 'captured');
-/**
- * Remote status of a payment. Payment authorised on Adyen side.
- */
-define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED', 'authorised');
-/**
- * Remote status of a payment. Payment pending on Adyen side.
- */
-define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_PENDING', 'pending');
-/**
- * Remote status of a payment. Payment failure on Adyen side.
- */
-define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_FAILURE', 'failure');
-
-use Commerce\Adyen\Payment\Capture;
-use Commerce\Adyen\Payment\Transaction\Refund as RefundTransaction;
-use Commerce\Adyen\Payment\Transaction\Payment as PaymentTransaction;
-use Drupal\commerce_adyen\Controller\Payment;
-use Drupal\commerce_adyen\Controller\Checkout;
-
-/**
- * Implements hook_menu().
- */
-function commerce_adyen_menu() {
-  $items = [];
-
-  $items[COMMERCE_ADYEN_NOTIFICATION_URL] = [
-    'type' => MENU_CALLBACK,
-    'file' => 'includes/commerce_adyen.notification.inc',
-    'page callback' => 'commerce_adyen_notification',
-    'access callback' => TRUE,
-  ];
-
-  return $items;
-}
-
-/**
- * Implements hook_hook_info().
- */
-function commerce_adyen_hook_info() {
-  $api = module_load_include('api.php', 'commerce_adyen');
-  $info = [];
-  $matches = [];
-
-  if (FALSE === $api) {
-    throw new \RuntimeException(t('File "@file" with API documentations is not readable! Work of Commerce Adyen is impossible.', [
-      '@file' => $api,
-    ]));
-  }
-
-  // Read all function definitions from API documentation.
-  preg_match_all('/function\s+(' . DRUPAL_PHP_FUNCTION_PATTERN . ')/i', file_get_contents($api), $matches);
-
-  if (!empty($matches[1])) {
-    foreach (array_filter($matches[1], 'function_exists') as $hook) {
-      $info[str_replace('hook_', '', $hook)] = [
-        'group' => 'commerce',
-      ];
-    }
-  }
-
-  return $info;
-}
-
-/**
- * Get payment type definitions.
+ * Calculate the amount for send to gateway according to adyen platform.
  *
- * @return array[]
- *   Payment type definitions.
- *
- * @see hook_commerce_adyen_payment_types()
- */
-function commerce_adyen_payment_types() {
-  return commerce_adyen_services_collector(__FUNCTION__, function ($type, array $payment_type) {
-    if (empty($payment_type['label'])) {
-      throw new \InvalidArgumentException(t('Adyen payment type definition must have a label.'));
-    }
-
-    if (!isset($payment_type['controllers']['payment'])) {
-      throw new \InvalidArgumentException(t('Adyen payment type must have definition of payment controller.'));
-    }
-
-    if (!is_subclass_of($payment_type['controllers']['payment'], Payment::class)) {
-      throw new \InvalidArgumentException(t('Adyen payment type controller must be inherited from %class.', [
-        '%class' => Payment::class,
-      ]));
-    }
-
-    if (isset($payment_type['controllers']['checkout']) && !is_subclass_of($payment_type['controllers']['checkout'], Checkout::class)) {
-      throw new \InvalidArgumentException(t('Adyen payment checkout controller must be inherited from %class.', [
-        '%class' => Checkout::class,
-      ]));
-    }
-  });
-}
-
-/**
- * Get transaction type definitions.
- *
- * @return string[]
- *   Transaction type definitions.
- *
- * @see hook_commerce_adyen_transaction_types()
- */
-function commerce_adyen_transaction_types() {
-  // All attempts to override one of these transaction types should
-  // be restricted by forcing class inheritance.
-  $fundamental = [
-    'payment' => PaymentTransaction::class,
-    'refund' => RefundTransaction::class,
-  ];
-
-  $types = commerce_adyen_services_collector(__FUNCTION__, function ($type, $class) use ($fundamental) {
-    if (!class_exists($class)) {
-      throw new \InvalidArgumentException(t('Class %class does not exists.', [
-        '%class' => $class,
-      ]));
-    }
-
-    if (isset($fundamental[$type]) && !is_subclass_of($class, $fundamental[$type])) {
-      throw new \InvalidArgumentException(t('Transaction class %class must be inherited from %parent.', [
-        '%class' => $class,
-        '%parent' => $fundamental[$type],
-      ]));
-    }
-  });
-
-  // Prevent possibility to remove fundamental types. Set the
-  // default implementations to guarantee module operability.
-  foreach ($fundamental as $type => $class) {
-    if (empty($types[$type])) {
-      $types[$type] = $class;
-    }
-  }
-
-  return $types;
-}
-
-/**
- * Get an instance of transaction.
- *
- * @param string $type
- *   One of transaction types.
- * @param \stdClass|int|string $order
- *   Commerce order object or order ID.
- * @param string $remote_status
- *   Will be used as condition for loading existing transaction.
- *
- * @return PaymentTransaction|RefundTransaction
- *   An instance of transaction object.
- *
- * @see commerce_adyen_transaction_types()
- */
-function commerce_adyen_get_transaction_instance($type, $order, $remote_status = '') {
-  $types = commerce_adyen_transaction_types();
-
-  if (empty($types[$type])) {
-    throw new \InvalidArgumentException(t('Transaction type %type is not registered.', [
-      '%type' => $type,
-    ]));
-  }
-
-  return new $types[$type]($order, commerce_payment_method_instance_load(COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE), $remote_status);
-}
-
-/**
- * Collect data via Drupal hooks and allow to alter it.
- *
- * @param string $id
- *   An unique ID of implementations to collect. The "hook_$id"
- *   and "hook_$id_alter" functions will be called. In other words
- *   the "$id" - is the name of hook.
- * @param callable $resolver
- *   Function to validate the implementation. Must throw an exception
- *   to not place obtained element into the list.
- *
- * @return array
- *   An array of collected implementations.
- */
-function commerce_adyen_services_collector($id, callable $resolver) {
-  $cache_id = "commerce_adyen_services:$id";
-  $cache = \Drupal::cache()->get($cache_id);
-  $data = [];
-
-  if (FALSE === $cache || empty($cache->data)) {
-    $validator = function ($name, $item) use (&$data, $resolver) {
-      try {
-        // Throw an exception from resolver to not add the item to the list.
-        $resolver($name, $item);
-        // Validation passed. Add the data.
-        $data[$name] = $item;
-      }
-      catch (\Exception $e) {
-        unset($data[$name]);
-        watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
-      }
-    };
-
-    // Collect data.
-    foreach (\Drupal::moduleHandler()->invokeAll($id) as $name => $item) {
-      $validator($name, $item);
-    }
-
-    // Allow other modules to alter the implementations.
-    \Drupal::moduleHandler()->alter($id, $data);
-
-    // Validate data again after alteration.
-    foreach ($data as $name => $item) {
-      $validator($name, $item);
-    }
-
-    \Drupal::cache()->set($cache_id, $data);
-  }
-  else {
-    $data = $cache->data;
-  }
-
-  return $data;
-}
-
-/**
- * Payment capture request.
- *
- * @param \stdClass $order
- *   An instance of "commerce_order" entity.
- *
- * @see commerce_adyen_rules_action_info()
- */
-function commerce_adyen_capture_request(\stdClass $order) {
-  $flag = COMMERCE_ADYEN_PAYMENT_METHOD . '_capture_sent';
-
-  try {
-    if (!isset($order->order_id, $order->order_number)) {
-      throw new \InvalidArgumentException(t('An argument is not a valid object of the "@entity_type" entity.', [
-        '@entity_type' => 'commerce_order',
-      ]));
-    }
-
-    if (empty($order->data[$flag])) {
-      $capture = new Capture($order);
-      $options = ['%order_number' => $order->order_number];
-
-      if ($capture->isAvailable()) {
-        if ($capture->request()) {
-          // Mark that we don't need to resend the capture
-          // request once we successfully did this.
-          $order->data[$flag] = TRUE;
-          // Save the order.
-          $order->save();
-        }
-        else {
-          throw new \RuntimeException(t('Capture request for the %order_number order was rejected by Adyen.', $options));
-        }
-      }
-      else {
-        throw new \RuntimeException(t('Capture request cannot be performed for the %order_number order because it have no authorised Adyen transactions.', $options));
-      }
-    }
-  }
-  catch (\Exception $e) {
-    watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
-  }
-}
-
-/**
- * Process an amount due to strange behavior regarding some currencies.
- *
- * This function must be called for every price amount and all logic
- * for processing currencies must be here.
- *
- * @param int $amount
- *   Payment amount.
+ * @param float $amount
+ *   The amount.
  * @param string $currency
- *   Currency code.
+ *   The currency.
  *
  * @return int
- *   Updated amount.
+ *   Return the amount calculate.
  */
 function commerce_adyen_amount($amount, $currency) {
   switch ($currency) {
@@ -310,40 +24,16 @@ function commerce_adyen_amount($amount, $currency) {
     case 'HUF':
       $amount *= 100;
       break;
+
+    case 'EUR':
+      $amount *= 100;
+      break;
+
+    case 'USD':
+      $amount *= 100;
+      break;
+
   }
 
   return $amount;
-}
-
-/**
- * Instantiate payment controller.
- *
- * @param string $controller
- *   One of controller types: "payment" or "checkout".
- * @param string $payment_type
- *   One of payment type names.
- * @param array $settings
- *   Payment method settings.
- * @param array[] $payment_types
- *   List of payment types. Must be result of "commerce_adyen_payment_types()".
- *
- * @return Payment|Checkout|null
- *   NULL if payment type class cannot be instantiated.
- */
-function commerce_adyen_invoke_controller($controller, $payment_type, array $settings = NULL, array $payment_types = NULL) {
-  if (NULL === $payment_types) {
-    $payment_types = commerce_adyen_payment_types();
-  }
-
-  if (!isset($payment_types[$payment_type]['controllers'][$controller])) {
-    return NULL;
-  }
-
-  if (NULL === $settings) {
-    $settings = commerce_payment_method_instance_load(COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE)['settings'];
-  }
-
-  return new $payment_types[$payment_type]['controllers'][$controller](
-    isset($settings['payment_types'][$payment_type]) ? $settings['payment_types'][$payment_type] : []
-  );
 }

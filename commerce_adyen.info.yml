@@ -1,8 +1,8 @@
-name: 'Commerce Adyen'
+name: Commerce Adyen
 type: module
-description: 'Commerce Adyen'
+description: 'Provides payment gateway Adyen.'
+package: Commerce
 core: 8.x
-package: 'Commerce'
 dependencies:
-  - commerce_payment
-configure: 'commerce_adyen.settings'
+  - commerce:commerce
+  - commerce:commerce_payment
