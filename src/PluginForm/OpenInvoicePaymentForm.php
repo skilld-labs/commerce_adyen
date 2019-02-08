@@ -22,7 +22,7 @@ class OpenInvoicePaymentForm extends BasePaymentOffsiteForm {
 
     $form['gender'] = [
       '#type' => 'radios',
-      '#title' => t('Gender'),
+      '#title' => $this->t('Gender'),
       '#options' => [
         'MALE' => t('Male'),
         'FEMALE' => t('Female'),
